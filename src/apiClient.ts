@@ -1,0 +1,89 @@
+import { MonthProgress, StaffMember, YTDTask } from './types';
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Server request failed.');
+  }
+  return data as T;
+}
+
+export interface WorkbookPayload {
+  ytdTasks: YTDTask[];
+  staff: StaffMember[];
+  progressReports: MonthProgress[];
+  spreadsheetId?: string;
+}
+
+export interface SessionUser {
+  email: string;
+  displayName: string;
+  role: 'admin' | 'staff';
+  uid: string;
+}
+
+export const ApiClient = {
+  login(email: string, password: string) {
+    return apiFetch<{
+      requiresPasswordChange?: boolean;
+      staff?: StaffMember;
+      user?: SessionUser;
+      workbook?: WorkbookPayload;
+    }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  changePassword(email: string, currentPassword: string, newPassword: string) {
+    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, currentPassword, newPassword }),
+    });
+  },
+
+  resetPassword(email: string, name: string, newPassword: string) {
+    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, name, newPassword }),
+    });
+  },
+
+  logout() {
+    return apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
+  },
+
+  loadWorkbook() {
+    return apiFetch<WorkbookPayload>('/api/workbook');
+  },
+
+  saveProgress(email: string, reports: MonthProgress[], ytdTasks?: YTDTask[]) {
+    return apiFetch<WorkbookPayload>('/api/progress', {
+      method: 'POST',
+      body: JSON.stringify({ email, reports, ytdTasks }),
+    });
+  },
+
+  saveYTDTasks(tasks: YTDTask[]) {
+    return apiFetch<WorkbookPayload>('/api/ytd', {
+      method: 'POST',
+      body: JSON.stringify({ tasks }),
+    });
+  },
+
+  saveStaff(staff: StaffMember[], progressReports?: MonthProgress[]) {
+    return apiFetch<WorkbookPayload>('/api/staff', {
+      method: 'POST',
+      body: JSON.stringify({ staff, progressReports }),
+    });
+  },
+};

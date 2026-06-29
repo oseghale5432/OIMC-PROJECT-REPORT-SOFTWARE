@@ -36,6 +36,7 @@ import YTDPage from './components/YTDPage';
 import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
 import { googleSignIn } from './firebase';
+import { ApiClient, WorkbookPayload } from './apiClient';
 
 export default function App() {
   // Authentication & Session States
@@ -60,6 +61,7 @@ export default function App() {
   // First-Time Password Setup States
   const [isFirstLoginMode, setIsFirstLoginMode] = useState(false);
   const [firstLoginStaff, setFirstLoginStaff] = useState<StaffMember | null>(null);
+  const [firstLoginCurrentPassword, setFirstLoginCurrentPassword] = useState('');
   const [newFirstPassword, setNewFirstPassword] = useState('');
   const [confirmFirstPassword, setConfirmFirstPassword] = useState('');
 
@@ -181,6 +183,21 @@ export default function App() {
     lastSyncedAt: null,
   });
 
+  const applyServerWorkbook = (workbook: WorkbookPayload) => {
+    setTasks(workbook.ytdTasks || []);
+    setStaffList(workbook.staff || []);
+    setProgressReports(workbook.progressReports || []);
+    setSheetsConfig((prev) => ({
+      ...prev,
+      spreadsheetId: workbook.spreadsheetId || prev.spreadsheetId || 'server-managed',
+      spreadsheetUrl: workbook.spreadsheetId
+        ? `https://docs.google.com/spreadsheets/d/${workbook.spreadsheetId}/edit`
+        : prev.spreadsheetUrl,
+      isSynced: true,
+      lastSyncedAt: new Date().toLocaleTimeString(),
+    }));
+  };
+
   // Session restorer on mount
   useEffect(() => {
     const savedUser = localStorage.getItem('oi_current_user');
@@ -225,6 +242,16 @@ export default function App() {
       }
     }
   }, [currentUser, staffList, isRegisteredStaff, isAuthorized]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    ApiClient.loadWorkbook()
+      .then(applyServerWorkbook)
+      .catch((err) => {
+        console.warn('Server-managed workbook is not available yet:', err);
+      });
+  }, [currentUser?.email]);
 
   // Enforce Row-Level Tab Visibility (Employees cannot access overview page)
   useEffect(() => {
@@ -343,7 +370,7 @@ export default function App() {
   };
 
   // Custom Login Flow Handler
-  const handleCustomLogin = (e: React.FormEvent) => {
+  const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
     const email = loginEmail.trim().toLowerCase();
@@ -354,46 +381,31 @@ export default function App() {
       return;
     }
 
-    // Find staff member by email in the registered roster
-    const staff = staffList.find(s => s.email?.toLowerCase() === email);
-    if (!staff) {
-      setAuthError('Access Denied: This email address is not registered in our database. Please contact your system administrator to register your account.');
-      return;
+    try {
+      const result = await ApiClient.login(email, password);
+
+      if (result.requiresPasswordChange && result.staff) {
+        setFirstLoginStaff(result.staff);
+        setFirstLoginCurrentPassword(password);
+        setIsFirstLoginMode(true);
+        return;
+      }
+
+      if (result.user && result.workbook) {
+        setCurrentUser(result.user);
+        applyServerWorkbook(result.workbook);
+        handleSimulateEmailChange(result.user.email);
+        setAuthError(null);
+        setLoginEmail('');
+        setLoginPassword('');
+      }
+    } catch (err: any) {
+      setAuthError(`Access Denied: ${err.message || 'Login failed.'}`);
     }
-
-    // Check password
-    const expectedPassword = staff.password || 'password123'; // fallback default
-    if (password !== expectedPassword) {
-      setAuthError('Access Denied: The password you entered is incorrect. If you forgot your password, please use the Reset option below.');
-      return;
-    }
-
-    // If matches, check if it's the first login
-    if (staff.isFirstLogin || !staff.password) {
-      setFirstLoginStaff(staff);
-      setIsFirstLoginMode(true);
-      return;
-    }
-
-    // Successful login!
-    const loggedUser = {
-      email: staff.email,
-      displayName: staff.name,
-      role: staff.role || 'staff',
-      uid: `local-${staff.email}`
-    };
-
-    setCurrentUser(loggedUser);
-    handleSimulateEmailChange(staff.email);
-    setAuthError(null);
-    
-    // Clear form
-    setLoginEmail('');
-    setLoginPassword('');
   };
 
   // First-Time Login Password Activation Handler
-  const handleFirstTimePasswordSubmit = (e: React.FormEvent) => {
+  const handleFirstTimePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
     if (!firstLoginStaff) return;
@@ -411,49 +423,27 @@ export default function App() {
       return;
     }
 
-    // Update password in staff list
-    const updatedStaff = staffList.map(s => {
-      if (s.email?.toLowerCase() === firstLoginStaff.email?.toLowerCase()) {
-        return {
-          ...s,
-          password: pass,
-          isFirstLogin: false
-        };
-      }
-      return s;
-    });
+    try {
+      const result = await ApiClient.changePassword(firstLoginStaff.email, firstLoginCurrentPassword, pass);
+      setCurrentUser(result.user);
+      applyServerWorkbook(result.workbook);
+      handleSimulateEmailChange(result.user.email);
 
-    setStaffList(updatedStaff);
-    localStorage.setItem('oi_staff_list', JSON.stringify(updatedStaff));
-
-    // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId && token) {
-      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaff);
+      setIsFirstLoginMode(false);
+      setFirstLoginStaff(null);
+      setFirstLoginCurrentPassword('');
+      setNewFirstPassword('');
+      setConfirmFirstPassword('');
+      setLoginEmail('');
+      setLoginPassword('');
+      alert('Your secure custom password has been registered successfully! Welcome to the Progress Tracker portal.');
+    } catch (err: any) {
+      setAuthError(err.message || 'Password setup failed.');
     }
-
-    // Sign them in
-    const loggedUser = {
-      email: firstLoginStaff.email,
-      displayName: firstLoginStaff.name,
-      role: firstLoginStaff.role || 'staff',
-      uid: `local-${firstLoginStaff.email}`
-    };
-
-    setCurrentUser(loggedUser);
-    handleSimulateEmailChange(firstLoginStaff.email);
-
-    // Reset flow states
-    setIsFirstLoginMode(false);
-    setFirstLoginStaff(null);
-    setNewFirstPassword('');
-    setConfirmFirstPassword('');
-    setLoginEmail('');
-    setLoginPassword('');
-    alert('Your secure custom password has been registered successfully! Welcome to the Progress Tracker portal.');
   };
 
   // Self-Serve Forgot Password Reset Handler (Verifies name and resets password)
-  const handleForgotPasswordReset = (e: React.FormEvent) => {
+  const handleForgotPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
@@ -471,61 +461,30 @@ export default function App() {
       return;
     }
 
-    // Find staff member
-    const staff = staffList.find(s => s.email?.toLowerCase() === email);
-    if (!staff) {
-      setAuthError('Verification Failed: Email address is not registered in the database.');
-      return;
+    try {
+      const result = await ApiClient.resetPassword(email, name, newPass);
+      setCurrentUser(result.user);
+      applyServerWorkbook(result.workbook);
+      handleSimulateEmailChange(result.user.email);
+
+      setIsResetMode(false);
+      setResetName('');
+      setResetNewPassword('');
+      setLoginEmail('');
+      setLoginPassword('');
+      alert('Your password has been reset successfully! You have been logged into your secure session.');
+    } catch (err: any) {
+      setAuthError(`Verification Failed: ${err.message || 'Password reset failed.'}`);
     }
-
-    // Verify name match
-    if (staff.name.trim().toLowerCase() !== name) {
-      setAuthError('Verification Failed: The registered employee name does not match the email in our database. Please verify spelling or contact the administrator.');
-      return;
-    }
-
-    // Update password
-    const updatedStaff = staffList.map(s => {
-      if (s.email?.toLowerCase() === email) {
-        return {
-          ...s,
-          password: newPass,
-          isFirstLogin: false
-        };
-      }
-      return s;
-    });
-
-    setStaffList(updatedStaff);
-    localStorage.setItem('oi_staff_list', JSON.stringify(updatedStaff));
-
-    // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId && token) {
-      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaff);
-    }
-
-    // Automatically log them in as well
-    const loggedUser = {
-      email: staff.email,
-      displayName: staff.name,
-      role: staff.role || 'staff',
-      uid: `local-${staff.email}`
-    };
-
-    setCurrentUser(loggedUser);
-    handleSimulateEmailChange(staff.email);
-
-    // Reset fields
-    setIsResetMode(false);
-    setResetName('');
-    setResetNewPassword('');
-    setLoginEmail('');
-    setLoginPassword('');
-    alert('Your password has been reset successfully! You have been logged into your secure session.');
   };
 
   // Logout Trigger
   const handleLogout = async () => {
+    try {
+      await ApiClient.logout();
+    } catch (err) {
+      console.error('Server logout failed:', err);
+    }
     setCurrentUser(null);
     setToken(null);
     localStorage.removeItem('oi_current_user');
@@ -616,31 +575,31 @@ export default function App() {
     updatedTasks?: YTDTask[],
     updatedReports?: MonthProgress[]
   ) => {
-    if (!token || !sheetsConfig.spreadsheetId) return;
-
     setIsSyncing(true);
     try {
-      if (updatedTasks) {
-        await GoogleSheetsService.saveYTDTasksToSheet(token, sheetsConfig.spreadsheetId, updatedTasks);
-      }
-      if (updatedReports) {
-        await GoogleSheetsService.saveProgressReportsToSheet(token, sheetsConfig.spreadsheetId, updatedReports);
-      }
+      const workbook = updatedReports
+        ? await ApiClient.saveProgress(simulatedEmail, updatedReports, updatedTasks)
+        : updatedTasks
+        ? await ApiClient.saveYTDTasks(updatedTasks)
+        : null;
+
+      if (workbook) applyServerWorkbook(workbook);
       
       setSheetsConfig((prev) => ({
         ...prev,
         isSynced: true,
         lastSyncedAt: new Date().toLocaleTimeString(),
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error syncing updates to sheet:', err);
+      alert(`Could not sync changes to the server-managed Google Sheet: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
     }
   };
 
   // Add YTD Task
-  const handleAddTask = (newTask: Omit<YTDTask, 'id' | 'daysRemaining'>) => {
+  const handleAddTask = async (newTask: Omit<YTDTask, 'id' | 'daysRemaining'>) => {
     const due = new Date(newTask.dueDate);
     const start = new Date(newTask.startDate);
     const diffTime = due.getTime() - start.getTime();
@@ -657,34 +616,34 @@ export default function App() {
 
     // Sync to sheet if active
     if (sheetsConfig.spreadsheetId) {
-      syncUpdatesToGoogleSheet(updatedTasks, undefined);
+      await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
 
   // Update YTD Task
-  const handleUpdateTask = (updatedTask: YTDTask) => {
+  const handleUpdateTask = async (updatedTask: YTDTask) => {
     const updatedTasks = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updatedTasks);
 
     // Sync to sheet if active
     if (sheetsConfig.spreadsheetId) {
-      syncUpdatesToGoogleSheet(updatedTasks, undefined);
+      await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
 
   // Delete YTD Task
-  const handleDeleteTask = (id: string) => {
+  const handleDeleteTask = async (id: string) => {
     const updatedTasks = tasks.filter((t) => t.id !== id);
     setTasks(updatedTasks);
 
     // Sync to sheet if active
     if (sheetsConfig.spreadsheetId) {
-      syncUpdatesToGoogleSheet(updatedTasks, undefined);
+      await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
 
   // Save Progress reports and linked YTD Tasks for an employee
-  const handleSaveProgress = (email: string, updatedReports: MonthProgress[], updatedYTDTasks?: YTDTask[]) => {
+  const handleSaveProgress = async (email: string, updatedReports: MonthProgress[], updatedYTDTasks?: YTDTask[]) => {
     const updatedAllReports = progressReports.map((report) => {
       const match = updatedReports.find((r) => r.id === report.id);
       return match ? match : report;
@@ -692,15 +651,22 @@ export default function App() {
 
     setProgressReports(updatedAllReports);
 
-    let finalTasks = tasks;
     if (updatedYTDTasks) {
       setTasks(updatedYTDTasks);
-      finalTasks = updatedYTDTasks;
     }
 
     // Sync to sheet if active
     if (sheetsConfig.spreadsheetId) {
-      syncUpdatesToGoogleSheet(updatedYTDTasks ? updatedYTDTasks : undefined, updatedAllReports);
+      setIsSyncing(true);
+      try {
+        const workbook = await ApiClient.saveProgress(email, updatedReports, updatedYTDTasks);
+        applyServerWorkbook(workbook);
+      } catch (err: any) {
+        console.error('Error saving progress through server:', err);
+        alert(`Could not save progress to Google Sheets: ${err.message || err}`);
+      } finally {
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -711,7 +677,7 @@ export default function App() {
   };
 
   // Add new staff member and initialize progress reports
-  const handleAddStaff = (newStaff: StaffMember) => {
+  const handleAddStaff = async (newStaff: StaffMember) => {
     // Generate 12 months reports for this staff member
     const newReports: MonthProgress[] = MONTHS.map(month => ({
       id: `${newStaff.email}_${month}`,
@@ -728,25 +694,34 @@ export default function App() {
     setProgressReports(updatedReports);
 
     // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId && token) {
-      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaffList);
-      GoogleSheetsService.saveProgressReportsToSheet(token, sheetsConfig.spreadsheetId, updatedReports);
+    if (sheetsConfig.spreadsheetId) {
+      try {
+        const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
+        applyServerWorkbook(workbook);
+      } catch (err: any) {
+        alert(`Could not save staff profile to Google Sheets: ${err.message || err}`);
+      }
     }
   };
 
   // Update existing staff member (e.g., toggling role)
-  const handleUpdateStaff = (updatedStaff: StaffMember) => {
+  const handleUpdateStaff = async (updatedStaff: StaffMember) => {
     const updatedStaffList = staffList.map(s => s.email === updatedStaff.email ? updatedStaff : s);
     setStaffList(updatedStaffList);
 
     // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId && token) {
-      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaffList);
+    if (sheetsConfig.spreadsheetId) {
+      try {
+        const workbook = await ApiClient.saveStaff(updatedStaffList);
+        applyServerWorkbook(workbook);
+      } catch (err: any) {
+        alert(`Could not update staff profile in Google Sheets: ${err.message || err}`);
+      }
     }
   };
 
   // Delete staff member and their progress reports
-  const handleDeleteStaff = (email: string) => {
+  const handleDeleteStaff = async (email: string) => {
     const updatedStaffList = staffList.filter(s => s.email !== email);
     const updatedReports = progressReports.filter(r => r.staffEmail !== email);
 
@@ -754,9 +729,13 @@ export default function App() {
     setProgressReports(updatedReports);
 
     // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId && token) {
-      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaffList);
-      GoogleSheetsService.saveProgressReportsToSheet(token, sheetsConfig.spreadsheetId, updatedReports);
+    if (sheetsConfig.spreadsheetId) {
+      try {
+        const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
+        applyServerWorkbook(workbook);
+      } catch (err: any) {
+        alert(`Could not delete staff profile from Google Sheets: ${err.message || err}`);
+      }
     }
   };
 

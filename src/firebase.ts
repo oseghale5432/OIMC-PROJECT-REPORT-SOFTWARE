@@ -4,55 +4,71 @@
  */
 
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase App
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-
-// Configure Google OAuth Provider
-export const provider = new GoogleAuthProvider();
-
-// Add specific Google Sheets and Drive Scopes
-provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-
-// Flag to track sign-in state
-let isSigningIn = false;
-let cachedAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null;
-
-// Initialize auth state listener
-export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
-) => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else {
-        // If logged in but token is not in-memory (e.g., page reload),
-        // we can check if there's any fallback or trigger failure
-        if (onAuthFailure) onAuthFailure();
-      }
-    } else {
-      cachedAccessToken = null;
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('google_access_token');
-      }
-      if (onAuthFailure) onAuthFailure();
-    }
-  });
+type FirebaseUser = {
+  email?: string | null;
+  displayName?: string | null;
+  uid: string;
 };
 
-// Sign in with Google Popup
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+const app = initializeApp(firebaseConfig);
+
+let authClient: any = null;
+let googleProvider: any = null;
+let googleAuthProviderCtor: any = null;
+let cachedAccessToken: string | null =
+  typeof window !== 'undefined' ? localStorage.getItem('google_access_token') : null;
+
+const getFirebaseAuthClient = async () => {
+  if (authClient && googleProvider && googleAuthProviderCtor) {
+    return { auth: authClient, provider: googleProvider, GoogleAuthProvider: googleAuthProviderCtor };
+  }
+
+  const authModule: any = await import('firebase/auth');
+  authClient = authModule.getAuth(app);
+  googleAuthProviderCtor = authModule.GoogleAuthProvider;
+  googleProvider = new authModule.GoogleAuthProvider();
+
+  googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
+  googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+  googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
+  googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+
+  return { auth: authClient, provider: googleProvider, GoogleAuthProvider: googleAuthProviderCtor };
+};
+
+export const initAuth = (
+  onAuthSuccess?: (user: FirebaseUser, token: string) => void,
+  onAuthFailure?: () => void
+) => {
+  let unsubscribe = () => {};
+
+  getFirebaseAuthClient()
+    .then(({ auth }) => import('firebase/auth').then((authModule: any) => {
+      unsubscribe = authModule.onAuthStateChanged(auth, async (user: FirebaseUser | null) => {
+        if (user && cachedAccessToken) {
+          onAuthSuccess?.(user, cachedAccessToken);
+          return;
+        }
+
+        if (!user && typeof window !== 'undefined') {
+          cachedAccessToken = null;
+          localStorage.removeItem('google_access_token');
+        }
+        onAuthFailure?.();
+      });
+    }))
+    .catch(() => onAuthFailure?.());
+
+  return () => unsubscribe();
+};
+
+export const googleSignIn = async (): Promise<{ user: FirebaseUser; accessToken: string } | null> => {
   try {
-    isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
+    const { auth, provider, GoogleAuthProvider } = await getFirebaseAuthClient();
+    const authModule: any = await import('firebase/auth');
+    const result = await authModule.signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
       throw new Error('Failed to get access token from Google Auth');
@@ -66,19 +82,17 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
   } catch (error: any) {
     console.error('Sign-in error:', error);
     throw error;
-  } finally {
-    isSigningIn = false;
   }
 };
 
-// Get the current access token
 export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
 };
 
-// Log out
 export const logoutUser = async () => {
-  await signOut(auth);
+  const { auth } = await getFirebaseAuthClient();
+  const authModule: any = await import('firebase/auth');
+  await authModule.signOut(auth);
   cachedAccessToken = null;
   if (typeof window !== 'undefined') {
     localStorage.removeItem('google_access_token');
