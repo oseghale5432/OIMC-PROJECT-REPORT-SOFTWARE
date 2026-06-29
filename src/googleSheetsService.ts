@@ -132,8 +132,18 @@ export class GoogleSheetsService {
    * Saves Staff Profiles to Google Sheets
    */
   static async saveStaffProfilesToSheet(accessToken: string, spreadsheetId: string, staff: StaffMember[]): Promise<void> {
-    const range = 'Staff_Profiles!A1:G';
-    const headers = ['Email', 'Name', 'Department', 'Activity', 'Label', 'Is New (TRUE/FALSE)', 'Role (admin/staff)'];
+    const range = 'Staff_Profiles!A1:I';
+    const headers = [
+      'Email',
+      'Name',
+      'Department',
+      'Activity',
+      'Label',
+      'Is New (TRUE/FALSE)',
+      'Role (admin/staff)',
+      'Password',
+      'Is First Login (TRUE/FALSE)'
+    ];
 
     const rows = staff.map((s) => [
       s.email,
@@ -143,6 +153,8 @@ export class GoogleSheetsService {
       s.label,
       s.isNew ? 'TRUE' : 'FALSE',
       s.role || 'staff',
+      s.password || '',
+      s.isFirstLogin === false ? 'FALSE' : 'TRUE',
     ]);
 
     const values = [headers, ...rows];
@@ -210,7 +222,7 @@ export class GoogleSheetsService {
   }> {
     try {
       // Fetch ranges in batch to save requests
-      const ranges = ['YTD_Tasks!A1:K200', 'Staff_Profiles!A1:G100', 'Progress_Reports!A1:AH2000'];
+      const ranges = ['YTD_Tasks!A1:K200', 'Staff_Profiles!A1:I100', 'Progress_Reports!A1:AH2000'];
       const res = await fetch(`${API_BASE}/${spreadsheetId}/values:batchGet?ranges=${ranges.join('&ranges=')}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -262,6 +274,8 @@ export class GoogleSheetsService {
             label: row[4] || `${row[1]} (${row[2]})`,
             isNew: row[5] === 'TRUE',
             role: (row[6] as 'admin' | 'staff') || 'staff',
+            password: row[7] || '',
+            isFirstLogin: row[8] !== 'FALSE',
           });
         });
       }

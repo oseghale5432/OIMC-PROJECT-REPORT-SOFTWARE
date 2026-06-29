@@ -13,7 +13,15 @@ import {
   CheckCircle,
   FileSpreadsheet,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  Info,
+  Lock,
+  Mail,
+  Key,
+  User
 } from 'lucide-react';
 import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig } from './types';
 import { 
@@ -23,22 +31,39 @@ import {
   MONTHS
 } from './data/mockData';
 import { GoogleSheetsService } from './googleSheetsService';
-import { initAuth, googleSignIn, logoutUser, getAccessToken } from './firebase';
 import Header from './components/Header';
 import YTDPage from './components/YTDPage';
 import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
+import { googleSignIn } from './firebase';
 
 export default function App() {
   // Authentication & Session States
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+    const saved = localStorage.getItem('oi_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [token, setToken] = useState<string | null>(null);
   const [simulatedEmail, setSimulatedEmail] = useState<string>(() => {
     return localStorage.getItem('oi_simulated_email') || 'oseghale5432@gmail.com';
   });
   const [authError, setAuthError] = useState<string | null>(null);
   const [isInIframe, setIsInIframe] = useState(false);
-  const [simulatedLoginEmail, setSimulatedLoginEmail] = useState<string>('oseghale5432@gmail.com');
+  
+  // Custom login forms and credentials states
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetName, setResetName] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  
+  // First-Time Password Setup States
+  const [isFirstLoginMode, setIsFirstLoginMode] = useState(false);
+  const [firstLoginStaff, setFirstLoginStaff] = useState<StaffMember | null>(null);
+  const [newFirstPassword, setNewFirstPassword] = useState('');
+  const [confirmFirstPassword, setConfirmFirstPassword] = useState('');
+
+  const [showTroubleshooter, setShowTroubleshooter] = useState(false);
 
   useEffect(() => {
     setIsInIframe(window.self !== window.top);
@@ -51,8 +76,39 @@ export default function App() {
   });
   const [staffList, setStaffList] = useState<StaffMember[]>(() => {
     const saved = localStorage.getItem('oi_staff_list');
-    return saved ? JSON.parse(saved) : DEFAULT_STAFF;
+    let list: StaffMember[] = saved ? JSON.parse(saved) : DEFAULT_STAFF;
+    // Guarantee super admin exists and has a default initial password
+    const superAdminIndex = list.findIndex(s => s.email?.toLowerCase() === 'oseghale5432@gmail.com');
+    if (superAdminIndex === -1) {
+      list.push({
+        email: 'oseghale5432@gmail.com',
+        name: 'Admin Boss',
+        department: 'MANAGEMENT',
+        activity: 'SUPER ADMIN',
+        label: 'Admin Boss (Super Admin)',
+        isNew: false,
+        role: 'admin',
+        password: 'admin123',
+        isFirstLogin: true
+      });
+    } else {
+      const admin = list[superAdminIndex];
+      if (!admin.password) {
+        admin.password = 'admin123';
+        admin.isFirstLogin = true;
+      }
+    }
+    return list;
   });
+
+  // Keep currentUser synced to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('oi_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('oi_current_user');
+    }
+  }, [currentUser]);
   const [progressReports, setProgressReports] = useState<MonthProgress[]>(() => {
     const saved = localStorage.getItem('oi_progress_reports');
     return saved ? JSON.parse(saved) : generateDefaultProgressReports();
@@ -125,28 +181,22 @@ export default function App() {
     lastSyncedAt: null,
   });
 
-  // Initialize Firebase Auth
+  // Session restorer on mount
   useEffect(() => {
-    initAuth(
-      (user, cachedToken) => {
+    const savedUser = localStorage.getItem('oi_current_user');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
         setCurrentUser(user);
-        setToken(cachedToken);
-        
-        // When logging in, default simulated identity to user email
-        // Or if it matches a staff member's email, switch simulated identity to them.
+        // Ensure simulation matches logged in user if none stored
         const storedSimEmail = localStorage.getItem('oi_simulated_email');
         if (!storedSimEmail) {
           handleSimulateEmailChange(user.email || 'oseghale5432@gmail.com');
         }
-        
-        // Attempt to search for and link sheets automatically
-        autoFindAndLinkSheets(cachedToken);
-      },
-      () => {
-        setCurrentUser(null);
-        setToken(null);
+      } catch (e) {
+        console.error('Failed to restore login session:', e);
       }
-    );
+    }
   }, []);
 
   // Check authorization status
@@ -207,21 +257,74 @@ export default function App() {
     }
   };
 
-  // Google Login Trigger
-  const handleLogin = async () => {
+  // Connect Google account while already logged in (Admin Boss)
+  const handleConnectGoogle = async () => {
     setAuthError(null);
     try {
       const result = await googleSignIn();
       if (result) {
-        setCurrentUser(result.user);
         setToken(result.accessToken);
+        localStorage.setItem('google_access_token', result.accessToken);
+        
+        // Attempt to search for and link sheets automatically
+        await autoFindAndLinkSheets(result.accessToken);
+        alert('Google Drive & Sheets sync has been successfully connected!');
+      }
+    } catch (err: any) {
+      console.error('Google authorization failed:', err);
+      const errMsg = err?.message || String(err);
+      if (
+        errMsg.includes('popup-blocked') || 
+        errMsg.includes('cancelled-popup-request') || 
+        errMsg.includes('popup-closed-by-user') ||
+        errMsg.includes('Pending promise') ||
+        window.self !== window.top
+      ) {
+        alert(
+          'Google Connection popup was blocked or closed. Please allow popups or open the application in a new tab to authorize.'
+        );
+      } else {
+        alert(`Google connection failed: ${errMsg}`);
+      }
+    }
+  };
+
+  // Sign in with Google (Admin Boss)
+  const handleGoogleLogin = async () => {
+    setAuthError(null);
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        // Build logged in user
+        const loggedUser = {
+          email: result.user.email,
+          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Admin Boss',
+          role: 'admin',
+          uid: result.user.uid
+        };
+
+        // Standard checks
+        if (result.user.email?.toLowerCase() === 'oseghale5432@gmail.com') {
+          loggedUser.role = 'admin';
+        } else {
+          const staff = staffList.find(s => s.email?.toLowerCase() === result.user.email?.toLowerCase());
+          if (staff) {
+            loggedUser.role = staff.role || 'staff';
+          } else {
+            loggedUser.role = 'admin'; // default fallback for admin login bypass
+          }
+        }
+
+        setCurrentUser(loggedUser);
+        setToken(result.accessToken);
+        localStorage.setItem('google_access_token', result.accessToken);
         handleSimulateEmailChange(result.user.email || 'oseghale5432@gmail.com');
         
-        // Load or create sheet
+        // Auto search and link
         await autoFindAndLinkSheets(result.accessToken);
       }
     } catch (err: any) {
-      console.error('Login flow failed:', err);
+      console.error('Google sign-in flow failed:', err);
       const errMsg = err?.message || String(err);
       if (
         errMsg.includes('popup-blocked') || 
@@ -231,7 +334,7 @@ export default function App() {
         window.self !== window.top
       ) {
         setAuthError(
-          'Google Sign-In popup was closed, blocked, or cancelled. Please make sure to allow popups in your browser, open this application in a new tab, or use the Simulated Login below.'
+          'Google Sign-In popup was closed or blocked. Please allow popups, open this app in a new tab, or use the standard email & password fields.'
         );
       } else {
         setAuthError(`Sign-in error: ${errMsg}`);
@@ -239,15 +342,193 @@ export default function App() {
     }
   };
 
+  // Custom Login Flow Handler
+  const handleCustomLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    const email = loginEmail.trim().toLowerCase();
+    const password = loginPassword.trim();
+
+    if (!email || !password) {
+      setAuthError('Please enter both your email address and password.');
+      return;
+    }
+
+    // Find staff member by email in the registered roster
+    const staff = staffList.find(s => s.email?.toLowerCase() === email);
+    if (!staff) {
+      setAuthError('Access Denied: This email address is not registered in our database. Please contact your system administrator to register your account.');
+      return;
+    }
+
+    // Check password
+    const expectedPassword = staff.password || 'password123'; // fallback default
+    if (password !== expectedPassword) {
+      setAuthError('Access Denied: The password you entered is incorrect. If you forgot your password, please use the Reset option below.');
+      return;
+    }
+
+    // If matches, check if it's the first login
+    if (staff.isFirstLogin || !staff.password) {
+      setFirstLoginStaff(staff);
+      setIsFirstLoginMode(true);
+      return;
+    }
+
+    // Successful login!
+    const loggedUser = {
+      email: staff.email,
+      displayName: staff.name,
+      role: staff.role || 'staff',
+      uid: `local-${staff.email}`
+    };
+
+    setCurrentUser(loggedUser);
+    handleSimulateEmailChange(staff.email);
+    setAuthError(null);
+    
+    // Clear form
+    setLoginEmail('');
+    setLoginPassword('');
+  };
+
+  // First-Time Login Password Activation Handler
+  const handleFirstTimePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    if (!firstLoginStaff) return;
+
+    const pass = newFirstPassword.trim();
+    const confirm = confirmFirstPassword.trim();
+
+    if (pass.length < 6) {
+      setAuthError('Your new secure password must be at least 6 characters long.');
+      return;
+    }
+
+    if (pass !== confirm) {
+      setAuthError('The passwords you entered do not match. Please verify and try again.');
+      return;
+    }
+
+    // Update password in staff list
+    const updatedStaff = staffList.map(s => {
+      if (s.email?.toLowerCase() === firstLoginStaff.email?.toLowerCase()) {
+        return {
+          ...s,
+          password: pass,
+          isFirstLogin: false
+        };
+      }
+      return s;
+    });
+
+    setStaffList(updatedStaff);
+    localStorage.setItem('oi_staff_list', JSON.stringify(updatedStaff));
+
+    // Sync to Google Sheets if linked
+    if (sheetsConfig.spreadsheetId && token) {
+      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaff);
+    }
+
+    // Sign them in
+    const loggedUser = {
+      email: firstLoginStaff.email,
+      displayName: firstLoginStaff.name,
+      role: firstLoginStaff.role || 'staff',
+      uid: `local-${firstLoginStaff.email}`
+    };
+
+    setCurrentUser(loggedUser);
+    handleSimulateEmailChange(firstLoginStaff.email);
+
+    // Reset flow states
+    setIsFirstLoginMode(false);
+    setFirstLoginStaff(null);
+    setNewFirstPassword('');
+    setConfirmFirstPassword('');
+    setLoginEmail('');
+    setLoginPassword('');
+    alert('Your secure custom password has been registered successfully! Welcome to the Progress Tracker portal.');
+  };
+
+  // Self-Serve Forgot Password Reset Handler (Verifies name and resets password)
+  const handleForgotPasswordReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    const email = loginEmail.trim().toLowerCase();
+    const name = resetName.trim().toLowerCase();
+    const newPass = resetNewPassword.trim();
+
+    if (!email || !name || !newPass) {
+      setAuthError('Please fill in all verification fields to reset your password.');
+      return;
+    }
+
+    if (newPass.length < 6) {
+      setAuthError('Your new password must be at least 6 characters long.');
+      return;
+    }
+
+    // Find staff member
+    const staff = staffList.find(s => s.email?.toLowerCase() === email);
+    if (!staff) {
+      setAuthError('Verification Failed: Email address is not registered in the database.');
+      return;
+    }
+
+    // Verify name match
+    if (staff.name.trim().toLowerCase() !== name) {
+      setAuthError('Verification Failed: The registered employee name does not match the email in our database. Please verify spelling or contact the administrator.');
+      return;
+    }
+
+    // Update password
+    const updatedStaff = staffList.map(s => {
+      if (s.email?.toLowerCase() === email) {
+        return {
+          ...s,
+          password: newPass,
+          isFirstLogin: false
+        };
+      }
+      return s;
+    });
+
+    setStaffList(updatedStaff);
+    localStorage.setItem('oi_staff_list', JSON.stringify(updatedStaff));
+
+    // Sync to Google Sheets if linked
+    if (sheetsConfig.spreadsheetId && token) {
+      GoogleSheetsService.saveStaffProfilesToSheet(token, sheetsConfig.spreadsheetId, updatedStaff);
+    }
+
+    // Automatically log them in as well
+    const loggedUser = {
+      email: staff.email,
+      displayName: staff.name,
+      role: staff.role || 'staff',
+      uid: `local-${staff.email}`
+    };
+
+    setCurrentUser(loggedUser);
+    handleSimulateEmailChange(staff.email);
+
+    // Reset fields
+    setIsResetMode(false);
+    setResetName('');
+    setResetNewPassword('');
+    setLoginEmail('');
+    setLoginPassword('');
+    alert('Your password has been reset successfully! You have been logged into your secure session.');
+  };
+
   // Logout Trigger
   const handleLogout = async () => {
-    try {
-      await logoutUser();
-    } catch (e) {
-      console.warn('Firebase logout failed:', e);
-    }
     setCurrentUser(null);
     setToken(null);
+    localStorage.removeItem('oi_current_user');
     handleSimulateEmailChange('oseghale5432@gmail.com');
     setSheetsConfig({
       spreadsheetId: null,
@@ -259,16 +540,34 @@ export default function App() {
 
   // Handle linking / creating google sheets database
   const handleLinkSheets = async () => {
-    if (!token) {
-      alert('Please connect Google Drive first.');
-      return;
+    let activeToken = token;
+    if (!activeToken) {
+      const confirmConnect = confirm('To link a Google Sheet, you must first connect your Google Drive account. Would you like to connect now?');
+      if (!confirmConnect) return;
+      
+      try {
+        const result = await googleSignIn();
+        if (result) {
+          activeToken = result.accessToken;
+          setToken(result.accessToken);
+          localStorage.setItem('google_access_token', result.accessToken);
+        } else {
+          return;
+        }
+      } catch (err: any) {
+        console.error('Google authorization failed during sheets link:', err);
+        alert(`Google connection failed: ${err?.message || String(err)}`);
+        return;
+      }
     }
+
+    if (!activeToken) return;
     
     setIsLinkingSheets(true);
     try {
       // Create new sheet
       const newSheet = await GoogleSheetsService.createNewSpreadsheet(
-        token,
+        activeToken,
         tasks,
         staffList,
         progressReports
@@ -461,28 +760,6 @@ export default function App() {
     }
   };
 
-  const handleSimulatedLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = simulatedLoginEmail.trim().toLowerCase();
-    if (!email) {
-      setAuthError('Please enter a valid email address.');
-      return;
-    }
-
-    // Set simulated current user
-    const simUser = {
-      email: email,
-      displayName: email.split('@')[0],
-      photoURL: null,
-      uid: `simulated-${email}`,
-    };
-
-    setCurrentUser(simUser);
-    setToken('simulated_token');
-    handleSimulateEmailChange(email);
-    setAuthError(null);
-  };
-
   // If not logged in, render a gorgeous Landing & Login Page
   if (!currentUser) {
     return (
@@ -501,117 +778,281 @@ export default function App() {
               <h1 className="text-2xl font-bold tracking-tight text-slate-100">Progress Tracker</h1>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
-              Welcome to the Staff Performance & YTD Progress Portal. Please authenticate or enter a simulated identity below to access your dashboard.
+              Welcome to the Staff Performance & YTD Progress Portal.
             </p>
           </div>
 
           {authError && (
-            <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 text-xs text-rose-300 space-y-1">
-              <p className="font-bold">Authentication Notice</p>
+            <div className="bg-rose-950/40 border border-rose-800/60 rounded-xl p-4 text-xs text-rose-300 space-y-1 text-left">
+              <p className="font-bold">Access Notification</p>
               <p className="leading-relaxed">{authError}</p>
             </div>
           )}
 
-          {isInIframe && (
-            <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-4 text-xs text-amber-300 space-y-2">
-              <p className="font-bold">Browser Frame Restriction</p>
-              <p className="leading-relaxed">
-                Google Authentication popups are blocked inside sandboxed preview frames. Please launch this application in a new tab first or use the Simulated Login below.
-              </p>
-              <a
-                href={window.location.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center space-x-1.5 text-orange-400 hover:text-orange-300 font-bold underline transition-colors"
+          {/* First-Time Password Change Mode */}
+          {isFirstLoginMode && firstLoginStaff ? (
+            <form onSubmit={handleFirstTimePasswordSubmit} className="space-y-4">
+              <div className="bg-orange-950/20 border border-orange-900/30 p-4 rounded-xl space-y-1 text-left">
+                <p className="text-xs font-bold text-orange-400 flex items-center space-x-1.5 font-mono">
+                  <Key className="w-4 h-4" />
+                  <span>First-Time Password Activation</span>
+                </p>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Welcome, <strong className="text-white">{firstLoginStaff.name}</strong>! Since this is your first time signing in, you must set a personalized password to activate your account.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>New Custom Password</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="At least 6 characters"
+                  value={newFirstPassword}
+                  onChange={(e) => setNewFirstPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Confirm Custom Password</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Repeat your password"
+                  value={confirmFirstPassword}
+                  onChange={(e) => setConfirmFirstPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
               >
-                <span>Launch App in New Tab</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
+                <span>Activate Account & Sign In</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFirstLoginMode(false);
+                  setFirstLoginStaff(null);
+                  setAuthError(null);
+                }}
+                className="w-full text-center text-xs text-slate-500 hover:text-slate-400 hover:underline py-1.5 transition-colors font-mono"
+              >
+                Cancel and Go Back
+              </button>
+            </form>
+          ) : isResetMode ? (
+            /* Forgot Password / Password Reset Mode */
+            <form onSubmit={handleForgotPasswordReset} className="space-y-4">
+              <div className="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-1 text-left">
+                <p className="text-xs font-bold text-slate-300 flex items-center space-x-1.5 font-mono">
+                  <HelpCircle className="w-4 h-4 text-orange-400" />
+                  <span>Self-Serve Password Reset</span>
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Enter your registered email and your exact full name as listed on the staff roster to establish a new password.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Registered Email Address</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. uwa@orangeisland.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Registered Full Name</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Uwa"
+                  value={resetName}
+                  onChange={(e) => setResetName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Key className="w-3.5 h-3.5 text-slate-500" />
+                  <span>New Secure Password</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="At least 6 characters"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              >
+                <span>Reset Password & Log In</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetMode(false);
+                  setAuthError(null);
+                }}
+                className="w-full text-center text-xs text-slate-400 hover:text-slate-300 hover:underline py-1.5 transition-colors font-mono"
+              >
+                Return to Login Page
+              </button>
+            </form>
+          ) : (
+            /* Standard Email / Password Sign In Form */
+            <form onSubmit={handleCustomLogin} className="space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Email Address</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. uwa@orangeisland.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-mono font-bold text-slate-400 block flex items-center space-x-1">
+                    <Lock className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Password</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetMode(true);
+                      setAuthError(null);
+                    }}
+                    className="text-[11px] text-orange-400 hover:text-orange-300 hover:underline transition-colors font-mono font-bold"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+              >
+                <span>Sign In to Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-4 text-slate-500 font-mono text-[10px] tracking-wider uppercase">Or Admin Drive Sync</span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full bg-slate-850 hover:bg-slate-800 active:bg-slate-900 text-slate-100 border border-slate-800 hover:border-slate-700 font-sans font-medium py-3 px-4 rounded-xl shadow hover:shadow-lg transition-all flex items-center justify-center space-x-3 text-sm cursor-pointer"
+              >
+                <svg className="w-4 h-4 fill-current text-orange-400 animate-pulse" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+                <span>Sign In with Google (Admin Boss)</span>
+              </button>
+            </form>
           )}
 
-          <div className="space-y-4">
+          {/* Tips and Credentials Information Panel */}
+          <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
             <button
-              onClick={handleLogin}
-              className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-3 text-sm cursor-pointer"
+              type="button"
+              onClick={() => setShowTroubleshooter(!showTroubleshooter)}
+              className="w-full px-4 py-3 flex items-center justify-between text-slate-400 hover:text-slate-200 transition-colors text-xs font-mono font-semibold cursor-pointer"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              <span>Sign In with Google</span>
+              <div className="flex items-center space-x-2">
+                <Info className="w-4 h-4 text-orange-400" />
+                <span>Roster Access Guidelines</span>
+              </div>
+              {showTroubleshooter ? (
+                <ChevronUp className="w-4 h-4 text-slate-500" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-slate-500" />
+              )}
             </button>
+            {showTroubleshooter && (
+              <div className="p-4 border-t border-slate-850 bg-slate-950/80 text-xs text-slate-400 space-y-3 font-mono leading-relaxed text-left">
+                <div className="space-y-1">
+                  <p className="font-bold text-orange-400 text-[10px] uppercase tracking-wider">🔑 System Administrator Access</p>
+                  <p className="text-slate-300">
+                    Email: <span className="text-white select-all">oseghale5432@gmail.com</span>
+                  </p>
+                  <p className="text-slate-300">
+                    Initial Password: <span className="text-white select-all">admin123</span>
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    Note: The admin user will be prompted to customize their secure password upon first sign-in.
+                  </p>
+                </div>
+
+                <div className="space-y-1 pt-2 border-t border-slate-900">
+                  <p className="font-bold text-orange-400 text-[10px] uppercase tracking-wider">👥 Employee Access</p>
+                  <p className="text-slate-300">
+                    Employees can log in once registered by an administrator.
+                  </p>
+                  <p className="text-slate-300">
+                    Default Initial Password: Set by the administrator during registration (e.g. <span className="text-white">password123</span>).
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-800"></div>
-            <span className="flex-shrink mx-4 text-slate-500 font-mono text-[10px] tracking-wider uppercase">Or Simulate Login</span>
-            <div className="flex-grow border-t border-slate-800"></div>
-          </div>
-
-          <form onSubmit={handleSimulatedLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono font-bold text-slate-400 block">
-                Simulated Email Address
-              </label>
-              <input
-                type="email"
-                required
-                value={simulatedLoginEmail}
-                onChange={(e) => setSimulatedLoginEmail(e.target.value)}
-                placeholder="e.g., oseghale5432@gmail.com"
-                className="w-full bg-slate-950 border border-slate-850 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
-              />
-              <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
-                💡 Tip: Use <span className="text-orange-400 font-bold">oseghale5432@gmail.com</span> to log in as Super Admin.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-800 text-slate-100 border border-slate-700/80 hover:border-slate-600 font-sans font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
-            >
-              <span>Simulate Sandbox Sign-In</span>
-              <ArrowRight className="w-4 h-4 text-orange-400" />
-            </button>
-          </form>
 
           <div className="pt-4 border-t border-slate-800 text-center">
             <span className="text-[10px] text-slate-500 font-mono tracking-wider">
-              AUTHORIZED PERSONNEL ONLY
+              SECURE AUTHORIZED STAFF PORTAL
             </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render Access Denied view if logged in but unauthorized
-  if (currentUser && !isAuthorized) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 bg-red-950 border border-red-800/40 rounded-full flex items-center justify-center text-red-500 mx-auto animate-pulse">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-xl font-bold tracking-tight text-slate-100">Access Denied</h1>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Your Google account <span className="text-orange-400 font-mono text-xs font-semibold">{currentUser.email}</span> is not registered in the Orange Island Resorts Progress Tracker.
-            </p>
-          </div>
-          <p className="text-xs text-slate-500 leading-normal">
-            Only registered employees and designated administrators are allowed access. Please ask an admin to register your email in the system database.
-          </p>
-          <div className="pt-2 border-t border-slate-800/60">
-            <button
-              onClick={handleLogout}
-              className="w-full bg-red-700 hover:bg-red-800 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-colors"
-            >
-              Sign Out & Try Again
-            </button>
           </div>
         </div>
       </div>
@@ -628,13 +1069,15 @@ export default function App() {
         staffList={staffList}
         currentTab={currentTab}
         onTabChange={handleTabChange}
-        onLogin={handleLogin}
+        onLogin={() => {}}
         onLogout={handleLogout}
         isSheetsLinked={sheetsConfig.spreadsheetId !== null}
         onLinkSheets={handleLinkSheets}
         isLinkingSheets={isLinkingSheets}
         spreadsheetUrl={sheetsConfig.spreadsheetUrl}
         isAdmin={isActualAdmin}
+        hasToken={!!token}
+        onConnectGoogle={handleConnectGoogle}
       />
 
       {/* Main workspace container */}

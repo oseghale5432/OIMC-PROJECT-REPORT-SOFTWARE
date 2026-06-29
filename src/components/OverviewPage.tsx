@@ -78,6 +78,7 @@ export default function OverviewPage({
   const [newDept, setNewDept] = useState('PROJECTS');
   const [newActivity, setNewActivity] = useState('PROJECTS');
   const [newRole, setNewRole] = useState<'staff' | 'admin'>('staff');
+  const [newPassword, setNewPassword] = useState('password123');
 
   const isSuperAdmin = currentUser?.email?.toLowerCase() === 'oseghale5432@gmail.com';
 
@@ -115,6 +116,8 @@ export default function OverviewPage({
       label: `${newName.trim()} (${newDept})`,
       isNew: true,
       role: newRole,
+      password: newPassword.trim() || 'password123',
+      isFirstLogin: true,
     };
 
     onAddStaff(newStaff);
@@ -122,7 +125,8 @@ export default function OverviewPage({
     
     // Reset form
     setNewEmail('');
-    newName && setNewName('');
+    setNewName('');
+    setNewPassword('password123');
     setShowAddForm(false);
   };
 
@@ -545,9 +549,9 @@ export default function OverviewPage({
                 <UserPlus className="w-4 h-4 text-orange-500" />
                 <span>Register New Employee / Admin</span>
               </h3>
-              <form onSubmit={handleAddSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              <form onSubmit={handleAddSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Google Email</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Email Address</label>
                   <input
                     type="email"
                     required
@@ -598,6 +602,18 @@ export default function OverviewPage({
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Default Password</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. password123"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Initial Role</label>
                   <select
                     value={newRole}
@@ -610,7 +626,7 @@ export default function OverviewPage({
                   </select>
                 </div>
 
-                <div className="lg:col-span-5 flex justify-end pt-2">
+                <div className="lg:col-span-6 flex justify-end pt-2">
                   <button
                     type="submit"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-sans font-bold text-xs px-5 py-2 rounded-lg shadow-md transition-colors"

@@ -32,6 +32,8 @@ interface HeaderProps {
   isLinkingSheets: boolean;
   spreadsheetUrl: string | null;
   isAdmin: boolean;
+  hasToken: boolean;
+  onConnectGoogle: () => void;
 }
 
 export default function Header({
@@ -48,6 +50,8 @@ export default function Header({
   isLinkingSheets,
   spreadsheetUrl,
   isAdmin,
+  hasToken,
+  onConnectGoogle,
 }: HeaderProps) {
   const [showSimMenu, setShowSimMenu] = useState(false);
 
@@ -121,7 +125,7 @@ export default function Header({
           {/* Connection Status & Auth */}
           <div className="flex items-center space-x-4">
             {/* Google Sheets Status */}
-            {currentUser && (
+            {currentUser?.role === 'admin' && (
               <div className="hidden lg:flex items-center space-x-2">
                 {isSheetsLinked ? (
                   <a
@@ -134,11 +138,19 @@ export default function Header({
                     <Database className="w-3.5 h-3.5" />
                     <span>Sheets Database Active</span>
                   </a>
+                ) : !hasToken ? (
+                  <button
+                    onClick={onConnectGoogle}
+                    className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors cursor-pointer"
+                  >
+                    <Database className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                    <span>Connect Google Drive</span>
+                  </button>
                 ) : (
                   <button
                     onClick={onLinkSheets}
                     disabled={isLinkingSheets}
-                    className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors disabled:opacity-50"
+                    className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {isLinkingSheets ? (
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />

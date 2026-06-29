@@ -25,6 +25,8 @@ export interface StaffMember {
   label: string; // e.g., "Uwa (Projects)"
   isNew: boolean;
   role?: 'admin' | 'staff';
+  password?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface TaskItem {
