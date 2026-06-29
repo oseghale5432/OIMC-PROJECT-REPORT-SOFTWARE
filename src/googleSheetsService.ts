@@ -167,7 +167,7 @@ export class GoogleSheetsService {
    * To keep it fast, we write all reports as a flat list of records.
    */
   static async saveProgressReportsToSheet(accessToken: string, spreadsheetId: string, reports: MonthProgress[]): Promise<void> {
-    const range = 'Progress_Reports!A1:S';
+    const range = 'Progress_Reports!A1:AH';
     const headers = [
       'Report ID',
       'Staff Email',
