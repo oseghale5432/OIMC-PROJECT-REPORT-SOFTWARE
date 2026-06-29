@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Prevent 'TypeError: Cannot set property fetch of #<Window> which has only a getter'
+      // in sandboxed iframe environments
+      (function() {
+        const safeProperties = ['fetch', 'Headers', 'Response', 'Request', 'FormData'];
+        safeProperties.forEach(prop => {
+          try {
+            if (prop in window) {
+              const original = window[prop];
+              let current = original;
+              Object.defineProperty(window, prop, {
+                get() {
+                  return current;
+                },
+                set(val) {
+                  current = val;
+                },
+                configurable: true,
+                enumerable: true
+              });
+            }
+          } catch (e) {
+            console.warn(`Failed to make window.${prop} writable:`, e);
+          }
+        });
+      })();
+    </script>
+    <title>Orange Island Progress Tracker</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

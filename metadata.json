@@ -1,0 +1,6 @@
+{
+  "name": "Progress Tracker Report",
+  "description": "A web-based progress tracker report application where staff can log/update their tasks and admin can view real-time performance analytics integrated with Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
