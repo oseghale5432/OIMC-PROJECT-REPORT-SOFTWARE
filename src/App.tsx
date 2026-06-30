@@ -30,12 +30,10 @@ import {
   generateDefaultProgressReports,
   MONTHS
 } from './data/mockData';
-import { GoogleSheetsService } from './googleSheetsService';
 import Header from './components/Header';
 import YTDPage from './components/YTDPage';
 import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
-import { googleSignIn } from './firebase';
 import { ApiClient, WorkbookPayload } from './apiClient';
 
 const DEFAULT_CONTRACTOR_HEADS = [
@@ -75,7 +73,6 @@ export default function App() {
     const saved = localStorage.getItem('oi_current_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [token, setToken] = useState<string | null>(null);
   const [simulatedEmail, setSimulatedEmail] = useState<string>(() => {
     return localStorage.getItem('oi_simulated_email') || 'oseghale5432@gmail.com';
   });
@@ -350,115 +347,6 @@ export default function App() {
     }
   }, [simulatedEmail, currentTab, isActualAdmin]);
 
-  // Attempt to auto-find and load spreadsheet
-  const autoFindAndLinkSheets = async (accessToken: string) => {
-    setIsLinkingSheets(true);
-    try {
-      const foundSheet = await GoogleSheetsService.findExistingSheet(accessToken);
-      if (foundSheet) {
-        const url = `https://docs.google.com/spreadsheets/d/${foundSheet.id}/edit`;
-        setSheetsConfig({
-          spreadsheetId: foundSheet.id,
-          spreadsheetUrl: url,
-          isSynced: true,
-          lastSyncedAt: new Date().toLocaleTimeString(),
-        });
-        
-        // Load data from found sheet
-        await loadDataFromGoogleSheet(accessToken, foundSheet.id);
-      }
-    } catch (err) {
-      console.error('Error auto-linking sheet:', err);
-    } finally {
-      setIsLinkingSheets(false);
-    }
-  };
-
-  // Connect Google account while already logged in (Admin Boss)
-  const handleConnectGoogle = async () => {
-    setAuthError(null);
-    try {
-      const result = await googleSignIn();
-      if (result) {
-        setToken(result.accessToken);
-        localStorage.setItem('google_access_token', result.accessToken);
-        
-        // Attempt to search for and link sheets automatically
-        await autoFindAndLinkSheets(result.accessToken);
-        alert('Google Drive & Sheets sync has been successfully connected!');
-      }
-    } catch (err: any) {
-      console.error('Google authorization failed:', err);
-      const errMsg = err?.message || String(err);
-      if (
-        errMsg.includes('popup-blocked') || 
-        errMsg.includes('cancelled-popup-request') || 
-        errMsg.includes('popup-closed-by-user') ||
-        errMsg.includes('Pending promise') ||
-        window.self !== window.top
-      ) {
-        alert(
-          'Google Connection popup was blocked or closed. Please allow popups or open the application in a new tab to authorize.'
-        );
-      } else {
-        alert(`Google connection failed: ${errMsg}`);
-      }
-    }
-  };
-
-  // Sign in with Google (Admin Boss)
-  const handleGoogleLogin = async () => {
-    setAuthError(null);
-    try {
-      const result = await googleSignIn();
-      if (result) {
-        // Build logged in user
-        const loggedUser = {
-          email: result.user.email,
-          displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Admin Boss',
-          role: 'admin',
-          uid: result.user.uid
-        };
-
-        // Standard checks
-        if (result.user.email?.toLowerCase() === 'oseghale5432@gmail.com') {
-          loggedUser.role = 'admin';
-        } else {
-          const staff = staffList.find(s => s.email?.toLowerCase() === result.user.email?.toLowerCase());
-          if (staff) {
-            loggedUser.role = staff.role || 'staff';
-          } else {
-            loggedUser.role = 'admin'; // default fallback for admin login bypass
-          }
-        }
-
-        setCurrentUser(loggedUser);
-        setToken(result.accessToken);
-        localStorage.setItem('google_access_token', result.accessToken);
-        handleSimulateEmailChange(result.user.email || 'oseghale5432@gmail.com');
-        
-        // Auto search and link
-        await autoFindAndLinkSheets(result.accessToken);
-      }
-    } catch (err: any) {
-      console.error('Google sign-in flow failed:', err);
-      const errMsg = err?.message || String(err);
-      if (
-        errMsg.includes('popup-blocked') || 
-        errMsg.includes('cancelled-popup-request') || 
-        errMsg.includes('popup-closed-by-user') ||
-        errMsg.includes('Pending promise') ||
-        window.self !== window.top
-      ) {
-        setAuthError(
-          'Google Sign-In popup was closed or blocked. Please allow popups, open this app in a new tab, or use the standard email & password fields.'
-        );
-      } else {
-        setAuthError(`Sign-in error: ${errMsg}`);
-      }
-    }
-  };
-
   // Custom Login Flow Handler
   const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -576,7 +464,6 @@ export default function App() {
       console.error('Server logout failed:', err);
     }
     setCurrentUser(null);
-    setToken(null);
     localStorage.removeItem('oi_current_user');
     handleSimulateEmailChange('oseghale5432@gmail.com');
     setSheetsConfig({
@@ -587,76 +474,17 @@ export default function App() {
     });
   };
 
-  // Handle linking / creating google sheets database
+  // Load the one server-managed Google Sheets database configured in Vercel.
   const handleLinkSheets = async () => {
-    let activeToken = token;
-    if (!activeToken) {
-      const confirmConnect = confirm('To link a Google Sheet, you must first connect your Google Drive account. Would you like to connect now?');
-      if (!confirmConnect) return;
-      
-      try {
-        const result = await googleSignIn();
-        if (result) {
-          activeToken = result.accessToken;
-          setToken(result.accessToken);
-          localStorage.setItem('google_access_token', result.accessToken);
-        } else {
-          return;
-        }
-      } catch (err: any) {
-        console.error('Google authorization failed during sheets link:', err);
-        alert(`Google connection failed: ${err?.message || String(err)}`);
-        return;
-      }
-    }
-
-    if (!activeToken) return;
-    
     setIsLinkingSheets(true);
     try {
-      // Create new sheet
-      const newSheet = await GoogleSheetsService.createNewSpreadsheet(
-        activeToken,
-        tasks,
-        staffList,
-        progressReports
-      );
-
-      setSheetsConfig({
-        spreadsheetId: newSheet.spreadsheetId,
-        spreadsheetUrl: newSheet.spreadsheetUrl,
-        isSynced: true,
-        lastSyncedAt: new Date().toLocaleTimeString(),
-      });
-
-      alert('Spreadsheet Database created successfully in your Google Drive!');
+      await refreshServerWorkbook();
+      alert('Server-managed Google Sheets database loaded. Admins and employees are now using the same sheet.');
     } catch (err: any) {
-      console.error('Failed to create sheet:', err);
-      alert(`Failed to create spreadsheet: ${err.message || err}`);
+      console.error('Failed to load server-managed sheet:', err);
+      alert(`Could not load the server-managed Google Sheet. Check Vercel env GOOGLE_SHEETS_SPREADSHEET_ID and service account access. Details: ${err.message || err}`);
     } finally {
       setIsLinkingSheets(false);
-    }
-  };
-
-  // Load database from linked sheet
-  const loadDataFromGoogleSheet = async (accessToken: string, spreadsheetId: string) => {
-    try {
-      setIsSyncing(true);
-      const data = await GoogleSheetsService.fetchAllDataFromSheet(accessToken, spreadsheetId);
-      
-      if (data.ytdTasks && data.ytdTasks.length > 0) setTasks(data.ytdTasks);
-      if (data.staff && data.staff.length > 0) setStaffList(data.staff);
-      if (data.progressReports && data.progressReports.length > 0) setProgressReports(data.progressReports);
-
-      setSheetsConfig((prev) => ({
-        ...prev,
-        isSynced: true,
-        lastSyncedAt: new Date().toLocaleTimeString(),
-      }));
-    } catch (err) {
-      console.error('Error fetching sheet contents:', err);
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -1052,25 +880,6 @@ export default function App() {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-800"></div>
-                <span className="flex-shrink mx-4 text-slate-500 font-mono text-[10px] tracking-wider uppercase">Or Admin Drive Sync</span>
-                <div className="flex-grow border-t border-slate-800"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="w-full bg-slate-850 hover:bg-slate-800 active:bg-slate-900 text-slate-100 border border-slate-800 hover:border-slate-700 font-sans font-medium py-3 px-4 rounded-xl shadow hover:shadow-lg transition-all flex items-center justify-center space-x-3 text-sm cursor-pointer"
-              >
-                <svg className="w-4 h-4 fill-current text-orange-400 animate-pulse" viewBox="0 0 24 24">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                <span>Sign In with Google (Admin Boss)</span>
-              </button>
             </form>
           )}
 
@@ -1146,8 +955,6 @@ export default function App() {
         isLinkingSheets={isLinkingSheets}
         spreadsheetUrl={sheetsConfig.spreadsheetUrl}
         isAdmin={isActualAdmin}
-        hasToken={!!token}
-        onConnectGoogle={handleConnectGoogle}
       />
 
       {/* Main workspace container */}
@@ -1223,10 +1030,10 @@ export default function App() {
             <div className="space-y-1">
               <h3 className="font-sans font-extrabold text-base flex items-center space-x-2">
                 <Database className="w-5 h-5 animate-bounce" />
-                <span>Google Drive Integration Ready</span>
+                <span>Server Sheets Database Not Loaded</span>
               </h3>
               <p className="text-sm text-orange-50">
-                Create a linked workbook to save employee logs directly to a live Google Sheet spreadsheet in your Drive.
+                Load the shared Google Sheet configured in Vercel. Admins and employees must use this same database.
               </p>
             </div>
             <button
@@ -1239,7 +1046,7 @@ export default function App() {
               ) : (
                 <FileSpreadsheet className="w-4 h-4" />
               )}
-              <span>Initialize Sheets Database</span>
+              <span>Load Server Sheet</span>
             </button>
           </div>
         )}

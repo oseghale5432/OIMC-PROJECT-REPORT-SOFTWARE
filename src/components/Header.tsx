@@ -32,8 +32,6 @@ interface HeaderProps {
   isLinkingSheets: boolean;
   spreadsheetUrl: string | null;
   isAdmin: boolean;
-  hasToken: boolean;
-  onConnectGoogle: () => void;
 }
 
 export default function Header({
@@ -50,8 +48,6 @@ export default function Header({
   isLinkingSheets,
   spreadsheetUrl,
   isAdmin,
-  hasToken,
-  onConnectGoogle,
 }: HeaderProps) {
   const [showSimMenu, setShowSimMenu] = useState(false);
 
@@ -138,14 +134,6 @@ export default function Header({
                     <Database className="w-3.5 h-3.5" />
                     <span>Sheets Database Active</span>
                   </a>
-                ) : !hasToken ? (
-                  <button
-                    onClick={onConnectGoogle}
-                    className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors cursor-pointer"
-                  >
-                    <Database className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-                    <span>Connect Google Drive</span>
-                  </button>
                 ) : (
                   <button
                     onClick={onLinkSheets}
@@ -157,7 +145,7 @@ export default function Header({
                     ) : (
                       <Database className="w-3.5 h-3.5" />
                     )}
-                    <span>Link Google Sheet</span>
+                    <span>Load Server Sheet</span>
                   </button>
                 )}
               </div>
