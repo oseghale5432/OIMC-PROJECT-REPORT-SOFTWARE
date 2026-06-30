@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { getCookie, requireEnv, type ApiRequest } from './http';
 import type { SessionUser } from './types';
 

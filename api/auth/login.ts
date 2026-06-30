@@ -1,6 +1,6 @@
 import { readJson, sendJson, sessionCookie, type ApiRequest, type ApiResponse } from '../_lib/http';
 import { createSession, isHashedPassword, verifyPassword } from '../_lib/security';
-import { fetchWorkbook, sanitizeStaff, saveStaffProfiles } from '../_lib/googleSheets';
+import { fetchWorkbook, sanitizeStaff } from '../_lib/googleSheets';
 import type { SessionUser, StaffMember } from '../_lib/types';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
