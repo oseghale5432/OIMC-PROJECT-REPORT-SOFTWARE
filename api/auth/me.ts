@@ -1,5 +1,5 @@
-import { sendJson, type ApiRequest, type ApiResponse } from '../lib/http';
-import { getSessionUser } from '../lib/security';
+import { sendJson, type ApiRequest, type ApiResponse } from '../../server/http';
+import { getSessionUser } from '../../server/security';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });

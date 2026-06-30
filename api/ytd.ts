@@ -1,7 +1,7 @@
-import { readJson, sendJson, type ApiRequest, type ApiResponse } from './lib/http';
-import { getSessionUser, isAdmin } from './lib/security';
-import { fetchWorkbook, sanitizeStaff, saveYTDTasks } from './lib/googleSheets';
-import type { YTDTask } from './lib/types';
+import { readJson, sendJson, type ApiRequest, type ApiResponse } from '../server/http';
+import { getSessionUser, isAdmin } from '../server/security';
+import { fetchWorkbook, sanitizeStaff, saveYTDTasks } from '../server/googleSheets';
+import type { YTDTask } from '../server/types';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });

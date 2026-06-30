@@ -1,7 +1,7 @@
-import { readJson, sendJson, sessionCookie, type ApiRequest, type ApiResponse } from '../lib/http';
-import { createSession, isHashedPassword, verifyPassword } from '../lib/security';
-import { fetchWorkbook, sanitizeStaff } from '../lib/googleSheets';
-import type { SessionUser, StaffMember } from '../lib/types';
+import { readJson, sendJson, sessionCookie, type ApiRequest, type ApiResponse } from '../../server/http';
+import { createSession, isHashedPassword, verifyPassword } from '../../server/security';
+import { fetchWorkbook, sanitizeStaff } from '../../server/googleSheets';
+import type { SessionUser, StaffMember } from '../../server/types';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
