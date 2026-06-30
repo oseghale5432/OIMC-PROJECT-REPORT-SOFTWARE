@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { 
   Database, 
   ExternalLink, 
@@ -239,6 +239,20 @@ export default function App() {
     }));
   };
 
+  const refreshServerWorkbook = useCallback(async (options: { silent?: boolean } = {}) => {
+    if (!options.silent) setIsSyncing(true);
+    try {
+      const workbook = await ApiClient.loadWorkbook();
+      applyServerWorkbook(workbook);
+      return workbook;
+    } catch (err: any) {
+      console.warn('Server-managed workbook is not available yet:', err);
+      throw err;
+    } finally {
+      if (!options.silent) setIsSyncing(false);
+    }
+  }, []);
+
   // Session restorer on mount
   useEffect(() => {
     const savedUser = localStorage.getItem('oi_current_user');
@@ -287,12 +301,47 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
 
-    ApiClient.loadWorkbook()
-      .then(applyServerWorkbook)
+    refreshServerWorkbook()
       .catch((err) => {
-        console.warn('Server-managed workbook is not available yet:', err);
+        if (String(err?.message || err).includes('401')) {
+          setSheetsConfig({
+            spreadsheetId: null,
+            spreadsheetUrl: null,
+            isSynced: false,
+            lastSyncedAt: null,
+          });
+        }
       });
-  }, [currentUser?.email]);
+  }, [currentUser?.email, refreshServerWorkbook]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshServerWorkbook({ silent: true }).catch(() => {});
+      }
+    };
+
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [currentUser, refreshServerWorkbook]);
+
+  useEffect(() => {
+    if (!currentUser || currentTab !== 'ytd') return;
+
+    refreshServerWorkbook({ silent: true }).catch(() => {});
+    const timer = window.setInterval(() => {
+      refreshServerWorkbook({ silent: true }).catch(() => {});
+    }, 30000);
+
+    return () => window.clearInterval(timer);
+  }, [currentUser, currentTab, refreshServerWorkbook]);
 
   // Enforce Row-Level Tab Visibility (Employees cannot access overview page)
   useEffect(() => {
@@ -655,8 +704,8 @@ export default function App() {
     const updatedTasks = [...tasks, task];
     setTasks(updatedTasks);
 
-    // Sync to sheet if active
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in users save through the server-managed Google Sheet.
+    if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
@@ -666,8 +715,8 @@ export default function App() {
     const updatedTasks = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updatedTasks);
 
-    // Sync to sheet if active
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in users save through the server-managed Google Sheet.
+    if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
@@ -677,8 +726,8 @@ export default function App() {
     const updatedTasks = tasks.filter((t) => t.id !== id);
     setTasks(updatedTasks);
 
-    // Sync to sheet if active
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in users save through the server-managed Google Sheet.
+    if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
   };
@@ -697,8 +746,8 @@ export default function App() {
       setTasks(updatedYTDTasks);
     }
 
-    // Sync to sheet if active
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in users save through the server-managed Google Sheet.
+    if (currentUser) {
       setIsSyncing(true);
       try {
         const workbook = await ApiClient.saveProgress(email, updatedReports, updatedYTDTasks);
@@ -735,8 +784,8 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in admins save staff through the server-managed Google Sheet.
+    if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
@@ -751,8 +800,8 @@ export default function App() {
     const updatedStaffList = staffList.map(s => s.email === updatedStaff.email ? updatedStaff : s);
     setStaffList(updatedStaffList);
 
-    // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in admins save staff through the server-managed Google Sheet.
+    if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList);
         applyServerWorkbook(workbook);
@@ -770,8 +819,8 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Sync to Google Sheets if linked
-    if (sheetsConfig.spreadsheetId) {
+    // Logged-in admins save staff through the server-managed Google Sheet.
+    if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
@@ -1169,7 +1218,7 @@ export default function App() {
         )}
         
         {/* Drive & Sheet Sync Status banner */}
-        {currentUser && !sheetsConfig.spreadsheetId && (
+        {currentUser && isActualAdmin && !sheetsConfig.spreadsheetId && (
           <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
             <div className="space-y-1">
               <h3 className="font-sans font-extrabold text-base flex items-center space-x-2">
