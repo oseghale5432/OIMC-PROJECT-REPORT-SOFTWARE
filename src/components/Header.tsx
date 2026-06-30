@@ -14,7 +14,9 @@ import {
   ChevronDown,
   Database,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  Menu,
+  X
 } from 'lucide-react';
 import { StaffMember } from '../types';
 
@@ -50,8 +52,13 @@ export default function Header({
   isAdmin,
 }: HeaderProps) {
   const [showSimMenu, setShowSimMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const activeStaff = staffList.find((s) => s.email === simulatedEmail);
+  const handleTabClick = (tab: string) => {
+    onTabChange(tab);
+    setShowMobileMenu(false);
+  };
 
   return (
     <header id="app-header" className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
@@ -76,7 +83,7 @@ export default function Header({
           <nav className="hidden md:flex space-x-1" aria-label="Tabs">
             <button
               id="tab-ytd"
-              onClick={() => onTabChange('ytd')}
+              onClick={() => handleTabClick('ytd')}
               className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
                 currentTab === 'ytd'
                   ? 'bg-slate-800 text-orange-400 border border-slate-700'
@@ -91,7 +98,7 @@ export default function Header({
             {isAdmin && (
               <button
                 id="tab-overview"
-                onClick={() => onTabChange('overview')}
+                onClick={() => handleTabClick('overview')}
                 className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
                   currentTab === 'overview'
                     ? 'bg-slate-800 text-orange-400 border border-slate-700'
@@ -106,7 +113,7 @@ export default function Header({
             {/* My Section Tab */}
             <button
               id="tab-personal"
-              onClick={() => onTabChange('personal')}
+              onClick={() => handleTabClick('personal')}
               className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
                 currentTab === 'personal'
                   ? 'bg-slate-800 text-orange-400 border border-slate-700'
@@ -119,7 +126,17 @@ export default function Header({
           </nav>
 
           {/* Connection Status & Auth */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu((value) => !value)}
+              className="md:hidden p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-colors"
+              aria-label="Open navigation menu"
+              aria-expanded={showMobileMenu}
+            >
+              {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+
             {/* Google Sheets Status */}
             {currentUser?.role === 'admin' && (
               <div className="hidden lg:flex items-center space-x-2">
@@ -262,6 +279,98 @@ export default function Header({
             )}
           </div>
         </div>
+
+        {showMobileMenu && (
+          <div className="md:hidden border-t border-slate-800 py-3 space-y-3">
+            <nav className="grid grid-cols-1 gap-2" aria-label="Mobile tabs">
+              <button
+                type="button"
+                onClick={() => handleTabClick('ytd')}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                  currentTab === 'ytd'
+                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>2026 YTD Tasks</span>
+                </span>
+                {currentTab === 'ytd' && <CheckCircle className="w-4 h-4" />}
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => handleTabClick('overview')}
+                  className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                    currentTab === 'overview'
+                      ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                      : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="flex items-center space-x-2">
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Overview</span>
+                  </span>
+                  {currentTab === 'overview' && <CheckCircle className="w-4 h-4" />}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleTabClick('personal')}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                  currentTab === 'personal'
+                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <User className="w-4 h-4" />
+                  <span>{isAdmin ? 'Staff Sheets' : 'My Progress Report'}</span>
+                </span>
+                {currentTab === 'personal' && <CheckCircle className="w-4 h-4" />}
+              </button>
+            </nav>
+
+            {currentUser?.role === 'admin' && (
+              <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                {isSheetsLinked ? (
+                  <a
+                    href={spreadsheetUrl || '#'}
+                    target="_blank"
+                    referrerPolicy="no-referrer"
+                    className="flex items-center justify-between text-emerald-400 text-xs font-semibold"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <Database className="w-4 h-4" />
+                      <span>Sheets Database Active</span>
+                    </span>
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLinkSheets();
+                      setShowMobileMenu(false);
+                    }}
+                    disabled={isLinkingSheets}
+                    className="w-full flex items-center justify-center space-x-2 text-orange-400 text-xs font-semibold disabled:opacity-50"
+                  >
+                    {isLinkingSheets ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Database className="w-4 h-4" />
+                    )}
+                    <span>Load Server Sheet</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
