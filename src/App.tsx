@@ -880,6 +880,26 @@ export default function App() {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-4 text-slate-500 font-mono text-[10px] tracking-wider uppercase">Admin Access</span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetMode(false);
+                  setAuthError(null);
+                  setLoginEmail('oseghale5432@gmail.com');
+                  setLoginPassword('');
+                }}
+                className="w-full bg-slate-850 hover:bg-slate-800 active:bg-slate-900 text-slate-100 border border-slate-800 hover:border-slate-700 font-sans font-medium py-3 px-4 rounded-xl shadow hover:shadow-lg transition-all flex items-center justify-center space-x-3 text-sm cursor-pointer"
+              >
+                <Key className="w-4 h-4 text-orange-400" />
+                <span>Admin Boss Login</span>
+              </button>
+
             </form>
           )}
 
