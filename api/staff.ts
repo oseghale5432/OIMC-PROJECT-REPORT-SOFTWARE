@@ -1,7 +1,7 @@
-import { readJson, sendJson, type ApiRequest, type ApiResponse } from './_lib/http';
-import { getSessionUser, hashPassword, isAdmin, isHashedPassword } from './_lib/security';
-import { fetchWorkbook, sanitizeStaff, saveProgressReports, saveStaffProfiles } from './_lib/googleSheets';
-import type { MonthProgress, StaffMember } from './_lib/types';
+import { readJson, sendJson, type ApiRequest, type ApiResponse } from './lib/http';
+import { getSessionUser, hashPassword, isAdmin, isHashedPassword } from './lib/security';
+import { fetchWorkbook, sanitizeStaff, saveProgressReports, saveStaffProfiles } from './lib/googleSheets';
+import type { MonthProgress, StaffMember } from './lib/types';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
