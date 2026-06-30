@@ -1,9 +1,14 @@
-import { sendJson, type ApiRequest, type ApiResponse } from '../server/http';
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'GET') {
+    res.statusCode = 405;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
-  if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-
-  return sendJson(res, 200, {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({
     ok: true,
     env: {
       GOOGLE_SHEETS_SPREADSHEET_ID: Boolean(process.env.GOOGLE_SHEETS_SPREADSHEET_ID),
@@ -11,5 +16,5 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       GOOGLE_PRIVATE_KEY: Boolean(process.env.GOOGLE_PRIVATE_KEY),
       SESSION_SECRET: Boolean(process.env.SESSION_SECRET),
     },
-  });
+  }));
 }
