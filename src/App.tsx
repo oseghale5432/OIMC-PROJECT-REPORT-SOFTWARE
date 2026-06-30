@@ -685,10 +685,11 @@ export default function App() {
 
   // Save Progress reports and linked YTD Tasks for an employee
   const handleSaveProgress = async (email: string, updatedReports: MonthProgress[], updatedYTDTasks?: YTDTask[]) => {
+    const existingReportIds = new Set(progressReports.map((report) => report.id));
     const updatedAllReports = progressReports.map((report) => {
       const match = updatedReports.find((r) => r.id === report.id);
       return match ? match : report;
-    });
+    }).concat(updatedReports.filter((report) => !existingReportIds.has(report.id)));
 
     setProgressReports(updatedAllReports);
 

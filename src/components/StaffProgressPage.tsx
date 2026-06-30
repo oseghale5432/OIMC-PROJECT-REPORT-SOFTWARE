@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Save, 
   User, 
@@ -57,20 +57,28 @@ export default function StaffProgressPage({
   // Local state of the reports and YTD tasks being edited
   const [editedReports, setEditedReports] = useState<MonthProgress[]>([]);
   const [editedYTDTasks, setEditedYTDTasks] = useState<YTDTask[]>([]);
-  const [lastEmail, setLastEmail] = useState<string>('');
-  const [lastTasks, setLastTasks] = useState<YTDTask[]>([]);
 
-  // Sync state if simulated user changes
-  if (currentStaff.email !== lastEmail) {
-    setEditedReports(JSON.parse(JSON.stringify(staffReports)));
-    setLastEmail(currentStaff.email);
-  }
+  const buildBlankReports = (staff: StaffMember): MonthProgress[] => (
+    MONTHS.map((month) => ({
+      id: `${staff.email}_${month}`,
+      staffEmail: staff.email,
+      month,
+      activity: staff.activity || staff.department || '',
+      tasks: Array.from({ length: 15 }, () => ({
+        description: '',
+        completed: null,
+      })),
+    }))
+  );
 
-  // Sync YTD tasks list if parent tasks prop changes
-  if (tasks !== lastTasks) {
+  useEffect(() => {
+    const sourceReports = staffReports.length > 0 ? staffReports : buildBlankReports(currentStaff);
+    setEditedReports(JSON.parse(JSON.stringify(sourceReports)));
+  }, [currentStaff.email, progressReports]);
+
+  useEffect(() => {
     setEditedYTDTasks(JSON.parse(JSON.stringify(tasks)));
-    setLastTasks(tasks);
-  }
+  }, [tasks]);
 
   // Handle linking a task to a YTD task
   const handleLinkYTDTask = (month: string, taskIdx: number, ytdTaskId: string) => {

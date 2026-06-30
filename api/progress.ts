@@ -16,10 +16,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (!isAdmin(user) && user.email.toLowerCase() !== targetEmail) return sendJson(res, 403, { error: 'You can only edit your own workbook.' });
 
     const workbook = await fetchWorkbook();
+    const existingReportIds = new Set(workbook.progressReports.map((report) => report.id));
     const updatedReports = workbook.progressReports.map((report) => {
       const replacement = body.reports.find((r) => r.id === report.id && r.staffEmail.toLowerCase() === targetEmail);
       return replacement || report;
-    });
+    }).concat(
+      body.reports.filter((report) =>
+        report.staffEmail.toLowerCase() === targetEmail && !existingReportIds.has(report.id)
+      )
+    );
 
     let updatedTasks = workbook.ytdTasks;
     if (body.ytdTasks) {
