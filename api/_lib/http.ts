@@ -5,9 +5,12 @@ export interface ApiRequest {
 }
 
 export interface ApiResponse {
-  status: (statusCode: number) => ApiResponse;
+  status?: (statusCode: number) => ApiResponse;
+  statusCode?: number;
   setHeader: (name: string, value: string | string[]) => void;
-  send: (body: string) => void;
+  json?: (body: unknown) => void;
+  send?: (body: string) => void;
+  end?: (body: string) => void;
 }
 
 export async function readJson<T = any>(req: ApiRequest): Promise<T> {
@@ -17,8 +20,22 @@ export async function readJson<T = any>(req: ApiRequest): Promise<T> {
 }
 
 export function sendJson(res: ApiResponse, status: number, data: unknown) {
-  res.status(status).setHeader('Content-Type', 'application/json');
-  res.send(JSON.stringify(data));
+  res.statusCode = status;
+  res.status?.(status);
+  res.setHeader('Content-Type', 'application/json');
+
+  if (res.json) {
+    res.json(data);
+    return;
+  }
+
+  const body = JSON.stringify(data);
+  if (res.send) {
+    res.send(body);
+    return;
+  }
+
+  res.end?.(body);
 }
 
 export function methodNotAllowed(res: ApiResponse) {
