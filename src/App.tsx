@@ -38,6 +38,37 @@ import StaffProgressPage from './components/StaffProgressPage';
 import { googleSignIn } from './firebase';
 import { ApiClient, WorkbookPayload } from './apiClient';
 
+const DEFAULT_CONTRACTOR_HEADS = [
+  'BRICK MORTAR STEEL (BMS)',
+  '4 CLANS DEVELOPMENT',
+  'CENTURION (ACCESS)',
+  'DEL / VIATHAN (IPP)',
+  'DELANO ARCHITECS',
+  'EKEDC',
+  'ELIZABETH SANDFILLING',
+  'GATAS (GENERATORS)',
+  'GREEN TREATS (IRRIGATION)',
+  'INTRACONTRA / MTN',
+  'KENOL (NEW METERS)',
+  'KENOL (RETICULATION)',
+  'LASBCA',
+  'LASPPPA',
+  'LAWMA',
+  'OIDC ACCOUNTS',
+  'OIDC BOARD',
+  'OIMC',
+  'OTHER',
+  'PILGRIMS (CCTV)',
+  'PILGRIMS (GUARDS)',
+  'POWERFLOW',
+  'ROELAG (WWTP)',
+  'SAYKAY (ROADS)',
+  'STEERING COMMITTEE',
+  'TEZEON (WTP)',
+  'TISD (POWER VENDING)',
+  'VENCO',
+];
+
 export default function App() {
   // Authentication & Session States
   const [currentUser, setCurrentUser] = useState<any>(() => {
@@ -147,6 +178,11 @@ export default function App() {
     ];
   });
 
+  const [contractorHeads, setContractorHeads] = useState<string[]>(() => {
+    const saved = localStorage.getItem('oi_contractor_heads');
+    return saved ? JSON.parse(saved) : DEFAULT_CONTRACTOR_HEADS;
+  });
+
   const handleUpdateDepartments = (newDepts: string[]) => {
     setDepartments(newDepts);
     localStorage.setItem('oi_departments', JSON.stringify(newDepts));
@@ -155,6 +191,11 @@ export default function App() {
   const handleUpdateStatuses = (newStatuses: string[]) => {
     setStatuses(newStatuses);
     localStorage.setItem('oi_statuses', JSON.stringify(newStatuses));
+  };
+
+  const handleUpdateContractorHeads = (newContractorHeads: string[]) => {
+    setContractorHeads(newContractorHeads);
+    localStorage.setItem('oi_contractor_heads', JSON.stringify(newContractorHeads));
   };
 
   // Navigation & View States
@@ -1172,6 +1213,8 @@ export default function App() {
               isAdmin={isAdmin}
               departments={departments}
               statuses={statuses}
+              staffList={staffList}
+              contractorHeads={contractorHeads}
             />
           )}
 
@@ -1188,8 +1231,10 @@ export default function App() {
               currentUser={currentUser}
               departments={departments}
               statuses={statuses}
+              contractorHeads={contractorHeads}
               onUpdateDepartments={handleUpdateDepartments}
               onUpdateStatuses={handleUpdateStatuses}
+              onUpdateContractorHeads={handleUpdateContractorHeads}
             />
           )}
 

@@ -46,8 +46,10 @@ interface OverviewPageProps {
   currentUser: any;
   departments: string[];
   statuses: string[];
+  contractorHeads: string[];
   onUpdateDepartments: (depts: string[]) => void;
   onUpdateStatuses: (stats: string[]) => void;
+  onUpdateContractorHeads: (contractorHeads: string[]) => void;
 }
 
 export default function OverviewPage({
@@ -62,8 +64,10 @@ export default function OverviewPage({
   currentUser,
   departments,
   statuses,
+  contractorHeads,
   onUpdateDepartments,
   onUpdateStatuses,
+  onUpdateContractorHeads,
 }: OverviewPageProps) {
   // Sub-tabs within overview page
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'staff' | 'dropdowns'>('analytics');
@@ -734,7 +738,7 @@ export default function OverviewPage({
       )}
 
       {activeSubTab === 'dropdowns' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* Departments Manager */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
@@ -776,6 +780,28 @@ export default function OverviewPage({
                 onUpdateStatuses(updatedList);
               }}
               caseTransform="none"
+            />
+          </div>
+
+          {/* Contractor / Dept Head Options Manager */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
+              <FileText className="w-5 h-5 text-sky-500" />
+              <div>
+                <h3 className="font-sans font-bold text-slate-800 text-sm uppercase tracking-wide">
+                  Contractor / Dept Head Manager
+                </h3>
+                <p className="text-[10px] text-slate-400">Add or remove external parties and heads</p>
+              </div>
+            </div>
+
+            <DropdownItemManager
+              items={contractorHeads}
+              placeholder="e.g. POWERFLOW"
+              onUpdate={(updatedList) => {
+                onUpdateContractorHeads(updatedList);
+              }}
+              caseTransform="uppercase"
             />
           </div>
         </div>

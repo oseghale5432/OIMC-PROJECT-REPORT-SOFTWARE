@@ -16,6 +16,34 @@ type StaffMember = {
   isFirstLogin?: boolean;
 };
 
+type YTDTask = {
+  id: string;
+  department: string;
+  lead: string;
+  coWorker: string;
+  contractorHead: string;
+  description: string;
+  startDate: string;
+  dueDate: string;
+  daysRemaining: number;
+  status: string;
+  remark: string;
+};
+
+type TaskItem = {
+  description: string;
+  completed: boolean | null;
+  ytdTaskId?: string;
+};
+
+type MonthProgress = {
+  id: string;
+  staffEmail: string;
+  month: string;
+  activity: string;
+  tasks: TaskItem[];
+};
+
 function sendJson(res: any, status: number, data: unknown) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -139,6 +167,18 @@ async function fetchStaffProfiles() {
   return parseStaff(data.values || []);
 }
 
+async function fetchWorkbook() {
+  const ranges = ['YTD_Tasks!A1:K200', 'Progress_Reports!A1:AH5000'];
+  const query = ranges.map((range) => `ranges=${encodeURIComponent(range)}`).join('&');
+  const data = await sheetsFetch(`/values:batchGet?${query}`);
+  const valueRanges = data.valueRanges || [];
+
+  return {
+    ytdTasks: parseYTDTasks(valueRanges[0]?.values || []),
+    progressReports: parseProgressReports(valueRanges[1]?.values || []),
+  };
+}
+
 async function saveStaffProfiles(staff: StaffMember[]) {
   const headers = [
     'Email',
@@ -183,6 +223,49 @@ function parseStaff(raw: string[][]): StaffMember[] {
   }));
 }
 
+function parseYTDTasks(raw: string[][]): YTDTask[] {
+  return raw.slice(1).filter((row) => row[0]).map((row) => ({
+    id: row[0],
+    department: row[1] || '',
+    lead: row[2] || '',
+    coWorker: row[3] || '',
+    contractorHead: row[4] || '',
+    description: row[5] || '',
+    startDate: row[6] || '',
+    dueDate: row[7] || '',
+    daysRemaining: parseInt(row[8] || '0', 10),
+    status: row[9] || '',
+    remark: row[10] || '',
+  }));
+}
+
+function parseProgressReports(raw: string[][]): MonthProgress[] {
+  return raw.slice(1).filter((row) => row[0] && row[1]).map((row) => {
+    const tasks: TaskItem[] = [];
+    for (let i = 0; i < 15; i++) {
+      let description = row[4 + i] || '';
+      const completedRaw = row[19 + i] || '';
+      let completed: boolean | null = null;
+      if (completedRaw === '1') completed = true;
+      if (completedRaw === '0') completed = false;
+
+      const match = description.match(/^\[YTD:([^\]]+)\](.*)/);
+      const ytdTaskId = match?.[1];
+      if (match) description = match[2];
+
+      tasks.push({ description, completed, ytdTaskId });
+    }
+
+    return {
+      id: row[0],
+      staffEmail: row[1],
+      month: row[2] || '',
+      activity: row[3] || '',
+      tasks,
+    };
+  });
+}
+
 function sanitizeStaff(staff: StaffMember[]) {
   return staff.map(({ password, ...safeStaff }) => safeStaff);
 }
@@ -213,6 +296,7 @@ export default async function handler(req: any, res: any) {
         : s
     );
     await saveStaffProfiles(updatedStaff);
+    const workbook = await fetchWorkbook();
 
     const user = {
       email: staff.email,
@@ -225,9 +309,9 @@ export default async function handler(req: any, res: any) {
     return sendJson(res, 200, {
       user,
       workbook: {
-        ytdTasks: [],
+        ytdTasks: workbook.ytdTasks,
         staff: sanitizeStaff(updatedStaff),
-        progressReports: [],
+        progressReports: workbook.progressReports,
       },
     });
   } catch (error: any) {

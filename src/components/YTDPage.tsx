@@ -19,7 +19,7 @@ import {
   CheckCircle,
   Clock
 } from 'lucide-react';
-import { YTDTask } from '../types';
+import { StaffMember, YTDTask } from '../types';
 
 interface YTDPageProps {
   tasks: YTDTask[];
@@ -29,6 +29,8 @@ interface YTDPageProps {
   isAdmin: boolean;
   departments: string[];
   statuses: string[];
+  staffList: StaffMember[];
+  contractorHeads: string[];
 }
 
 export default function YTDPage({
@@ -39,6 +41,8 @@ export default function YTDPage({
   isAdmin,
   departments,
   statuses,
+  staffList,
+  contractorHeads,
 }: YTDPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -54,13 +58,18 @@ export default function YTDPage({
     description: '',
     startDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'Not started',
+    status: 'Not Started',
     remark: '',
   });
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<YTDTask | null>(null);
+  const staffOptions = [...staffList].sort((a, b) => a.name.localeCompare(b.name));
+  const normalizedContractorHeads = contractorHeads
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const uniqueContractorHeads = Array.from(new Set(normalizedContractorHeads));
 
   // Filtered tasks
   const filteredTasks = tasks.filter((task) => {
@@ -99,7 +108,7 @@ export default function YTDPage({
       description: '',
       startDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: 'Not started',
+      status: 'Not Started',
       remark: '',
     });
     setIsAdding(false);
@@ -224,13 +233,19 @@ export default function YTDPage({
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Managed / Lead</label>
-            <input
-              type="text"
+            <select
               value={newTask.lead}
               onChange={(e) => setNewTask({ ...newTask, lead: e.target.value })}
-              placeholder="e.g. Kate, Mr. B"
+              required
               className="w-full border border-slate-200 bg-white rounded-lg p-2 text-sm focus:ring-orange-500"
-            />
+            >
+              <option value="">Select staff lead</option>
+              {staffOptions.map((staff) => (
+                <option key={staff.email} value={staff.name}>
+                  {staff.label || staff.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -246,13 +261,18 @@ export default function YTDPage({
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Contractor / Dept Head</label>
-            <input
-              type="text"
+            <select
               value={newTask.contractorHead}
               onChange={(e) => setNewTask({ ...newTask, contractorHead: e.target.value })}
-              placeholder="e.g. OIMC, LASBCA"
               className="w-full border border-slate-200 bg-white rounded-lg p-2 text-sm focus:ring-orange-500"
-            />
+            >
+              <option value="">Select contractor / head</option>
+              {uniqueContractorHeads.map((contractorHead) => (
+                <option key={contractorHead} value={contractorHead}>
+                  {contractorHead}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -417,12 +437,21 @@ export default function YTDPage({
                       {/* Lead */}
                       <td className="p-3 border-r border-slate-100 font-medium text-slate-800">
                         {isEditing ? (
-                          <input
-                            type="text"
+                          <select
                             value={editingTask?.lead}
                             onChange={(e) => setEditingTask({ ...editingTask!, lead: e.target.value })}
                             className="w-full p-1 border rounded bg-white"
-                          />
+                          >
+                            <option value="">Select staff lead</option>
+                            {editingTask?.lead && !staffOptions.some((staff) => staff.name === editingTask.lead) && (
+                              <option value={editingTask.lead}>{editingTask.lead}</option>
+                            )}
+                            {staffOptions.map((staff) => (
+                              <option key={staff.email} value={staff.name}>
+                                {staff.label || staff.name}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           task.lead
                         )}
@@ -445,12 +474,21 @@ export default function YTDPage({
                       {/* Contractor Head */}
                       <td className="p-3 border-r border-slate-100 font-medium">
                         {isEditing ? (
-                          <input
-                            type="text"
+                          <select
                             value={editingTask?.contractorHead}
                             onChange={(e) => setEditingTask({ ...editingTask!, contractorHead: e.target.value })}
                             className="w-full p-1 border rounded bg-white"
-                          />
+                          >
+                            <option value="">Select contractor / head</option>
+                            {editingTask?.contractorHead && !uniqueContractorHeads.includes(editingTask.contractorHead) && (
+                              <option value={editingTask.contractorHead}>{editingTask.contractorHead}</option>
+                            )}
+                            {uniqueContractorHeads.map((contractorHead) => (
+                              <option key={contractorHead} value={contractorHead}>
+                                {contractorHead}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
                           task.contractorHead || <span className="text-slate-300">-</span>
                         )}
