@@ -10,9 +10,19 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     },
   });
 
-  const data = await res.json().catch(() => ({}));
+  const responseText = await res.text();
+  let data: any = {};
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    data = {};
+  }
+
   if (!res.ok) {
-    throw new Error(data.error || 'Server request failed.');
+    const fallback = responseText
+      ? responseText.replace(/\s+/g, ' ').trim().slice(0, 220)
+      : 'No response body.';
+    throw new Error(data.error || `Server request failed (${res.status} ${res.statusText}): ${fallback}`);
   }
   return data as T;
 }
