@@ -44,7 +44,7 @@ export default function StaffProgressPage({
   tasks,
   statuses,
 }: StaffProgressPageProps) {
-  // Find currently selected staff (excluding Admin Boss from selection unless they are simulating someone)
+  // Find currently selected staff (excluding Super Admin from selection unless they are simulating someone)
   const trackingStaffList = staffList.filter((s) => s.role !== 'admin');
   const currentStaff = trackingStaffList.find((s) => s.email === simulatedEmail) || trackingStaffList[0] || staffList[0];
   
@@ -57,6 +57,9 @@ export default function StaffProgressPage({
   // Local state of the reports and YTD tasks being edited
   const [editedReports, setEditedReports] = useState<MonthProgress[]>([]);
   const [editedYTDTasks, setEditedYTDTasks] = useState<YTDTask[]>([]);
+  const linkableYTDTasks = isAdmin
+    ? editedYTDTasks
+    : editedYTDTasks.filter((task) => task.department.toLowerCase() === currentStaff.department.toLowerCase());
 
   const buildBlankReports = (staff: StaffMember): MonthProgress[] => (
     MONTHS.map((month) => ({
@@ -82,6 +85,11 @@ export default function StaffProgressPage({
 
   // Handle linking a task to a YTD task
   const handleLinkYTDTask = (month: string, taskIdx: number, ytdTaskId: string) => {
+    if (ytdTaskId && ytdTaskId !== 'CHOOSE' && !linkableYTDTasks.some((task) => task.id === ytdTaskId)) {
+      alert(`You can only link YTD tasks from the ${currentStaff.department} department.`);
+      return;
+    }
+
     setEditedReports((prev) => 
       prev.map((r) => {
         if (r.month === month) {
@@ -354,7 +362,7 @@ export default function StaffProgressPage({
                           >
                             <option value="">-- Choose YTD Task to Link --</option>
                             <option value="CHOOSE" disabled hidden>-- Choose YTD Task to Link --</option>
-                            {editedYTDTasks.map((t) => (
+                            {linkableYTDTasks.map((t) => (
                               <option key={t.id} value={t.id}>
                                 [{t.department}] {t.description.substring(0, 50)}... ({t.lead})
                               </option>

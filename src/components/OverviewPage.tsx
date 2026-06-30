@@ -29,7 +29,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   Search,
-  UserPlus
+  UserPlus,
+  XCircle
 } from 'lucide-react';
 import { StaffMember, MonthProgress } from '../types';
 import { MONTHS } from '../data/mockData';
@@ -398,12 +399,12 @@ export default function OverviewPage({
               </div>
               <div className="flex items-center space-x-4 text-xs">
                 <div className="flex items-center space-x-1.5 text-slate-500">
-                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded text-center text-[7px] text-white font-bold leading-none flex items-center justify-center">1</span>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Completed</span>
                 </div>
                 <div className="flex items-center space-x-1.5 text-slate-500">
-                  <span className="w-2.5 h-2.5 bg-sky-500 rounded text-center text-[7px] text-white font-bold leading-none flex items-center justify-center">0</span>
-                  <span>Pending</span>
+                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span>Not Done</span>
                 </div>
                 <div className="flex items-center space-x-1.5 text-slate-500">
                   <span className="w-2.5 h-2.5 bg-slate-200 rounded"></span>
@@ -475,14 +476,14 @@ export default function OverviewPage({
                             : `Task ${i + 1}: No task assigned`;
 
                           let bgClass = 'bg-slate-100/60 text-slate-300';
-                          let content = '';
+                          let content: React.ReactNode = '';
 
                           if (state === 1) {
-                            bgClass = 'bg-emerald-500 text-white font-bold scale-[0.85] rounded shadow-sm shadow-emerald-500/10';
-                            content = '1';
+                            bgClass = 'bg-emerald-50 text-emerald-600 rounded border border-emerald-200';
+                            content = <CheckCircle2 className="w-4 h-4" />;
                           } else if (state === 0) {
-                            bgClass = 'bg-sky-500 text-white font-bold scale-[0.85] rounded shadow-sm shadow-sky-500/10';
-                            content = '0';
+                            bgClass = 'bg-red-50 text-red-600 rounded border border-red-200';
+                            content = <XCircle className="w-4 h-4" />;
                           }
 
                           return (
@@ -512,8 +513,8 @@ export default function OverviewPage({
             </div>
             <div className="font-mono text-[10px] bg-white border border-slate-200 px-3 py-1.5 rounded-lg">
               <div className="font-bold mb-1 border-b pb-1 text-slate-700">KEY DEFINITION:</div>
-              <div>1 = TASK COMPLETED</div>
-              <div>0 = TASK NOT COMPLETED / PENDING</div>
+              <div className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-600" /> = TASK COMPLETED</div>
+              <div className="flex items-center gap-1"><XCircle className="w-3 h-3 text-red-600" /> = TASK NOT COMPLETED / PENDING</div>
               <div>Empty/Gray = NO ASSIGNED TASK FOR THIS PERIOD</div>
             </div>
           </div>

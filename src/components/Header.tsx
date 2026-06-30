@@ -161,7 +161,7 @@ export default function Header({
                 >
                   <Shield className="w-3.5 h-3.5 text-orange-400" />
                   <span className="max-w-[120px] truncate">
-                    Identity: {activeStaff ? activeStaff.name : 'Admin Boss'}
+                    Identity: {activeStaff ? activeStaff.name : 'Super Admin'}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
@@ -172,7 +172,7 @@ export default function Header({
                       Switch Active Persona
                     </div>
                     
-                    {/* Admin Boss */}
+                    {/* Super Admin */}
                     <button
                       onClick={() => {
                         onSimulateEmailChange('oseghale5432@gmail.com');
@@ -184,7 +184,7 @@ export default function Header({
                     >
                       <div className="flex items-center space-x-2">
                         <Shield className="w-3.5 h-3.5 text-orange-400" />
-                        <span>Admin Boss (All Views)</span>
+                        <span>Super Admin (All Views)</span>
                       </div>
                       {simulatedEmail === 'oseghale5432@gmail.com' && (
                         <CheckCircle className="w-3.5 h-3.5" />

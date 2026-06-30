@@ -112,10 +112,10 @@ export default function App() {
     if (superAdminIndex === -1) {
       list.push({
         email: 'oseghale5432@gmail.com',
-        name: 'Admin Boss',
+        name: 'Super Admin',
         department: 'MANAGEMENT',
         activity: 'SUPER ADMIN',
-        label: 'Admin Boss (Super Admin)',
+        label: 'Super Admin',
         isNew: false,
         role: 'admin',
         password: 'admin123',
@@ -123,6 +123,8 @@ export default function App() {
       });
     } else {
       const admin = list[superAdminIndex];
+      if (admin.name === 'Admin Boss') admin.name = 'Super Admin';
+      if (!admin.label || admin.label.includes('Admin Boss')) admin.label = 'Super Admin';
       if (!admin.password) {
         admin.password = 'admin123';
         admin.isFirstLogin = true;
@@ -223,7 +225,15 @@ export default function App() {
 
   const applyServerWorkbook = (workbook: WorkbookPayload) => {
     setTasks(workbook.ytdTasks || []);
-    setStaffList(workbook.staff || []);
+    setStaffList((workbook.staff || []).map((staff) => (
+      staff.email?.toLowerCase() === 'oseghale5432@gmail.com'
+        ? {
+            ...staff,
+            name: staff.name === 'Admin Boss' ? 'Super Admin' : staff.name || 'Super Admin',
+            label: !staff.label || staff.label.includes('Admin Boss') ? 'Super Admin' : staff.label,
+          }
+        : staff
+    )));
     setProgressReports(workbook.progressReports || []);
     setSheetsConfig((prev) => ({
       ...prev,
@@ -878,26 +888,6 @@ export default function App() {
               >
                 <span>Sign In to Dashboard</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-slate-800"></div>
-                <span className="flex-shrink mx-4 text-slate-500 font-mono text-[10px] tracking-wider uppercase">Admin Access</span>
-                <div className="flex-grow border-t border-slate-800"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsResetMode(false);
-                  setAuthError(null);
-                  setLoginEmail('oseghale5432@gmail.com');
-                  setLoginPassword('');
-                }}
-                className="w-full bg-slate-850 hover:bg-slate-800 active:bg-slate-900 text-slate-100 border border-slate-800 hover:border-slate-700 font-sans font-medium py-3 px-4 rounded-xl shadow hover:shadow-lg transition-all flex items-center justify-center space-x-3 text-sm cursor-pointer"
-              >
-                <Key className="w-4 h-4 text-orange-400" />
-                <span>Admin Boss Login</span>
               </button>
 
             </form>

@@ -8,10 +8,10 @@ import { StaffMember, YTDTask, MonthProgress } from '../types';
 export const DEFAULT_STAFF: StaffMember[] = [
   { 
     email: 'oseghale5432@gmail.com', 
-    name: 'Admin Boss', 
+    name: 'Super Admin', 
     department: 'MANAGEMENT', 
     activity: 'SUPER ADMIN', 
-    label: 'Admin Boss (Super Admin)', 
+    label: 'Super Admin', 
     isNew: false, 
     role: 'admin' 
   }
