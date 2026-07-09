@@ -57,9 +57,9 @@ export default function StaffProgressPage({
   // Local state of the reports and YTD tasks being edited
   const [editedReports, setEditedReports] = useState<MonthProgress[]>([]);
   const [editedYTDTasks, setEditedYTDTasks] = useState<YTDTask[]>([]);
-  const linkableYTDTasks = isAdmin
-    ? editedYTDTasks
-    : editedYTDTasks.filter((task) => task.department.toLowerCase() === currentStaff.department.toLowerCase());
+  const linkableYTDTasks = editedYTDTasks.filter(
+    (task) => task.department.toLowerCase() === currentStaff.department.toLowerCase()
+  );
 
   const buildBlankReports = (staff: StaffMember): MonthProgress[] => (
     MONTHS.map((month) => ({
@@ -112,33 +112,6 @@ export default function StaffProgressPage({
               ytdTaskId: ytdTaskId,
             };
           }
-          return { ...r, tasks: updatedTasks };
-        }
-        return r;
-      })
-    );
-  };
-
-  // Handle task description text change (only for custom/unlinked tasks)
-  const handleDescriptionChange = (month: string, taskIdx: number, text: string) => {
-    setEditedReports((prev) => 
-      prev.map((r) => {
-        if (r.month === month) {
-          const updatedTasks = [...r.tasks];
-          const oldTask = updatedTasks[taskIdx] || { description: '', completed: null };
-          
-          let comp = oldTask.completed;
-          if (text === '') {
-            comp = null;
-          } else if (oldTask.description === '' && text !== '') {
-            comp = false;
-          }
-
-          updatedTasks[taskIdx] = {
-            ...oldTask,
-            description: text,
-            completed: comp,
-          };
           return { ...r, tasks: updatedTasks };
         }
         return r;
@@ -248,7 +221,7 @@ export default function StaffProgressPage({
         <div className="space-y-1">
           <span className="font-bold text-orange-400 uppercase tracking-wider block">Interactive Progress Logger</span>
           <p className="text-slate-300">
-            Select a month below to view your progress workbook. For each task slot, you can create a custom task, or <span className="text-orange-300 font-bold">Link to 2026 YTD tasks</span>. When linked, entering the status and remarks updates the master project sheets dynamically!
+            Select a month, then match each task slot to one of this staff member's <span className="text-orange-300 font-bold">2026 YTD department tasks</span>. Status and remarks update the master project sheet dynamically.
           </p>
         </div>
         <div className="bg-slate-800 px-3.5 py-2 rounded-lg font-mono text-[10px] text-slate-300 border border-slate-700 min-w-[200px]">
@@ -322,110 +295,57 @@ export default function StaffProgressPage({
                       </h4>
                     </div>
 
-                    {/* Task Source Type Selector */}
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Source:</span>
-                      <select
-                        value={isLinked ? 'ytd' : 'custom'}
-                        onChange={(e) => {
-                          if (e.target.value === 'custom') {
-                            handleLinkYTDTask(activeMonth, i, '');
-                          } else {
-                            // Automatically link to first matching task or empty string
-                            handleLinkYTDTask(activeMonth, i, 'CHOOSE');
-                          }
-                        }}
-                        className="bg-slate-50 border border-slate-200 rounded py-0.5 px-2 text-[10px] font-semibold text-slate-600 focus:outline-none"
-                      >
-                        <option value="custom">Custom Task</option>
-                        <option value="ytd">Link YTD Task</option>
-                      </select>
-                    </div>
                   </div>
 
                   {/* Card Main Body */}
                   <div className="space-y-3 flex-1">
-                    {isLinked ? (
-                      /* LINKED YTD TASK INTERFACE */
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <label className="text-[9px] font-bold text-orange-500 uppercase tracking-wider flex items-center space-x-1">
-                            <Link2 className="w-3 h-3" />
-                            <span>Linked 2026 YTD Project Task</span>
-                          </label>
-                          
-                          {/* YTD Selector */}
-                          <select
-                            value={task.ytdTaskId || ''}
-                            onChange={(e) => handleLinkYTDTask(activeMonth, i, e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
-                          >
-                            <option value="">-- Choose YTD Task to Link --</option>
-                            <option value="CHOOSE" disabled hidden>-- Choose YTD Task to Link --</option>
-                            {linkableYTDTasks.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                [{t.department}] {t.description.substring(0, 50)}... ({t.lead})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-orange-500 uppercase tracking-wider flex items-center space-x-1">
+                        <Link2 className="w-3 h-3" />
+                        <span>Assigned 2026 YTD Task</span>
+                      </label>
+                      <select
+                        value={task.ytdTaskId || ''}
+                        onChange={(e) => handleLinkYTDTask(activeMonth, i, e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      >
+                        <option value="">-- Select a staff task --</option>
+                        {linkableYTDTasks.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.description.substring(0, 70)}{t.description.length > 70 ? '…' : ''} ({t.lead})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                        {linkedYTDTask ? (
-                          /* DISPLAY LINKED TASK DETAILED INFORMATION & DIRECT STATUS/REMARK INPUT */
-                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 space-y-3">
-                            <p className="text-xs font-medium text-slate-700 italic leading-relaxed">
-                              "{linkedYTDTask.description}"
-                            </p>
-                            
-                            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/60">
-                              {/* Status Link Column */}
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">YTD Status Column</label>
-                                <select
-                                  value={linkedYTDTask.status || ''}
-                                  onChange={(e) => handleUpdateLinkedStatus(linkedYTDTask.id, e.target.value)}
-                                  className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
-                                >
-                                  <option value="">Not set</option>
-                                  {statuses.map((stat) => (
-                                    <option key={stat} value={stat}>{stat}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* Remark Link Column */}
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">YTD Remark Column</label>
-                                <input
-                                  type="text"
-                                  value={linkedYTDTask.remark || ''}
-                                  onChange={(e) => handleUpdateLinkedRemark(linkedYTDTask.id, e.target.value)}
-                                  placeholder="e.g. Completed phase 1"
-                                  className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
-                                />
-                              </div>
-                            </div>
+                    {linkedYTDTask && (
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-150 space-y-3">
+                        <p className="text-xs font-medium text-slate-700 italic leading-relaxed">
+                          "{linkedYTDTask.description}"
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/60">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">YTD Status Column</label>
+                            <select
+                              value={linkedYTDTask.status || ''}
+                              onChange={(e) => handleUpdateLinkedStatus(linkedYTDTask.id, e.target.value)}
+                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
+                            >
+                              <option value="">Not set</option>
+                              {statuses.map((stat) => <option key={stat} value={stat}>{stat}</option>)}
+                            </select>
                           </div>
-                        ) : (
-                          task.ytdTaskId !== 'CHOOSE' && (
-                            <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex items-center space-x-2 text-amber-800 text-[11px]">
-                              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                              <span>This task link seems to refer to a deleted or missing YTD Task!</span>
-                            </div>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      /* CUSTOM UNLINKED TASK INTERFACE */
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Task Description</label>
-                        <textarea
-                          value={task.description}
-                          onChange={(e) => handleDescriptionChange(activeMonth, i, e.target.value)}
-                          placeholder={`Type task details completed during ${activeMonth}...`}
-                          rows={2}
-                          className="w-full bg-slate-50 border border-slate-200 hover:border-slate-300 focus:bg-white focus:ring-1 focus:ring-orange-500 rounded-lg p-2 text-xs font-medium text-slate-700 focus:outline-none transition-all resize-none"
-                        />
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">YTD Remark Column</label>
+                            <input
+                              type="text"
+                              value={linkedYTDTask.remark || ''}
+                              onChange={(e) => handleUpdateLinkedRemark(linkedYTDTask.id, e.target.value)}
+                              placeholder="e.g. Completed phase 1"
+                              className="w-full bg-white border border-slate-200 rounded p-1.5 text-xs font-semibold text-slate-700 focus:outline-none"
+                            />
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
