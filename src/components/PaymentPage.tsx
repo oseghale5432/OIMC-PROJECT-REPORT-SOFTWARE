@@ -5,7 +5,8 @@ import { splitAccountingCode } from '../data/accountingCodes';
 
 interface PaymentPageProps {
   payments: PaymentRequest[];
-  canProcess: boolean;
+  canApprove: boolean;
+  canComplete: boolean;
   isSaving: boolean;
   accountingCodes: string[];
   error: string | null;
@@ -22,7 +23,8 @@ const statusStyles: Record<PaymentStatus, string> = {
 
 export default function PaymentPage({
   payments,
-  canProcess,
+  canApprove,
+  canComplete,
   isSaving,
   accountingCodes,
   error,
@@ -30,6 +32,7 @@ export default function PaymentPage({
   onUpdateStatus,
 }: PaymentPageProps) {
   const [form, setForm] = useState({ code: '', payment: '', description: '', amount: '' });
+  const canManage = canApprove || canComplete;
   const sortedPayments = useMemo(
     () => [...payments].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     [payments]
@@ -53,8 +56,12 @@ export default function PaymentPage({
           <div>
             <h2 className="text-xl font-extrabold">Payment Requests</h2>
             <p className="mt-1 text-sm text-slate-300">
-              {canProcess
-                ? 'Review staff requests, approve them for processing, and confirm completed payments.'
+              {canManage
+                ? canApprove && canComplete
+                  ? 'Approve requests and confirm completed payments.'
+                  : canApprove
+                    ? 'Review staff requests and approve them for Accounts to process.'
+                    : 'Process approved requests and confirm completed payments.'
                 : 'Submit a payment request and follow its progress through to payment.'}
             </p>
           </div>
@@ -67,7 +74,7 @@ export default function PaymentPage({
         </div>
       )}
 
-      {!canProcess && (
+      {!canManage && (
         <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-4 font-bold text-slate-800">New payment request</h3>
           <div className="grid gap-4 md:grid-cols-2">
@@ -112,8 +119,8 @@ export default function PaymentPage({
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 p-5">
-          <h3 className="font-bold text-slate-800">{canProcess ? 'Requests awaiting action' : 'My requests'}</h3>
-          {canProcess && <span className="flex items-center gap-1 text-xs font-bold text-slate-500"><ShieldCheck className="h-4 w-4" /> Admin / Accounts</span>}
+          <h3 className="font-bold text-slate-800">{canManage ? 'Payment requests' : 'My requests'}</h3>
+          {canManage && <span className="flex items-center gap-1 text-xs font-bold text-slate-500"><ShieldCheck className="h-4 w-4" /> {canApprove ? 'Admin approval' : 'Accounts processing'}</span>}
         </div>
         {sortedPayments.length === 0 ? (
           <div className="p-12 text-center text-sm text-slate-500">No payment requests yet.</div>
@@ -121,7 +128,7 @@ export default function PaymentPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr><th className="p-4">Code</th><th className="p-4">Payment</th><th className="p-4">Description</th><th className="p-4">Amount</th>{canProcess && <th className="p-4">Requested by</th>}<th className="p-4">Status</th><th className="p-4">Submitted</th>{canProcess && <th className="p-4">Action</th>}</tr>
+                <tr><th className="p-4">Code</th><th className="p-4">Payment</th><th className="p-4">Description</th><th className="p-4">Amount</th>{canManage && <th className="p-4">Requested by</th>}<th className="p-4">Status</th><th className="p-4">Submitted</th>{canManage && <th className="p-4">Action</th>}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedPayments.map((item) => (
@@ -130,23 +137,29 @@ export default function PaymentPage({
                     <td className="p-4 font-semibold text-slate-800">{item.payment}</td>
                     <td className="max-w-xs p-4 text-slate-600">{item.description}</td>
                     <td className="p-4 font-bold text-slate-900">₦{item.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</td>
-                    {canProcess && <td className="p-4"><div className="font-medium text-slate-700">{item.requestedByName}</div><div className="text-xs text-slate-400">{item.requestedByEmail}</div></td>}
+                    {canManage && <td className="p-4"><div className="font-medium text-slate-700">{item.requestedByName}</div><div className="text-xs text-slate-400">{item.requestedByEmail}</div></td>}
                     <td className="p-4"><span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${statusStyles[item.status]}`}>{item.status === 'Payment Made' ? <CheckCircle2 className="h-3.5 w-3.5" /> : item.status === 'Rejected' ? <XCircle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}{item.status}</span></td>
                     <td className="p-4 text-xs text-slate-500">{new Date(item.submittedAt).toLocaleString()}</td>
-                    {canProcess && (
+                    {canManage && (
                       <td className="p-4">
-                        {item.status === 'Pending Approval' ? (
+                        {canApprove && item.status === 'Pending Approval' ? (
                           <div className="flex gap-2">
                             <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Approved for Processing')}
                               className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">Approve</button>
                             <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Rejected')}
                               className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50">Reject</button>
                           </div>
-                        ) : item.status === 'Approved for Processing' ? (
+                        ) : canComplete && item.status === 'Approved for Processing' ? (
                           <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Payment Made')}
                             className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">Mark Payment Made</button>
                         ) : (
-                          <span className="text-xs font-medium text-slate-400">Completed</span>
+                          <span className="text-xs font-medium text-slate-400">
+                            {item.status === 'Pending Approval'
+                              ? 'Waiting for Admin'
+                              : item.status === 'Approved for Processing'
+                                ? 'Sent to Accounts'
+                                : 'Completed'}
+                          </span>
                         )}
                       </td>
                     )}

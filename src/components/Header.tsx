@@ -66,16 +66,15 @@ export default function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo / Title */}
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center shadow-md shadow-orange-500/20">
-              <FileSpreadsheet className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-mono text-xs tracking-widest text-orange-400 font-bold">ORANGE ISLAND</span>
-              </div>
-              <h1 className="font-sans font-bold text-lg tracking-tight -mt-1 text-slate-100">
-                Progress Tracker
+          <div className="flex items-center gap-3 shrink-0">
+            <img
+              src={new URL('../../assets/orange-island-logo-white.png', import.meta.url).href}
+              alt="Orange Island Lagos"
+              className="h-11 w-auto max-w-[112px] object-contain"
+            />
+            <div className="hidden xl:block border-l border-slate-700 pl-3">
+              <h1 className="font-sans font-bold text-sm leading-tight text-slate-100">
+                Progress<br />Tracker
               </h1>
             </div>
           </div>
@@ -249,16 +248,10 @@ export default function Header({
 
             {/* Google Authentication */}
             {currentUser ? (
-              <div className="flex items-center space-x-2">
-                <img
-                  src={currentUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&h=80'}
-                  alt={currentUser.displayName || 'User'}
-                  className="w-8 h-8 rounded-full border border-slate-700"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="flex items-center">
                 <button
                   onClick={onLogout}
-                  className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
+                  className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-colors"
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />

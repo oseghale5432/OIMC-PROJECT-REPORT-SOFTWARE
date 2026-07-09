@@ -21,7 +21,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { StaffMember, MonthProgress, TaskItem, YTDTask } from '../types';
-import { MONTHS } from '../data/mockData';
+import { getCurrentLagosMonth, MONTHS } from '../data/mockData';
 
 interface StaffProgressPageProps {
   staffList: StaffMember[];
@@ -49,7 +49,7 @@ export default function StaffProgressPage({
   const currentStaff = trackingStaffList.find((s) => s.email === simulatedEmail) || trackingStaffList[0] || staffList[0];
   
   // Local state for selected month to edit
-  const [activeMonth, setActiveMonth] = useState<string>('May');
+  const [activeMonth, setActiveMonth] = useState<string>(getCurrentLagosMonth);
 
   // Filter progress reports for this specific staff member
   const staffReports = progressReports.filter((r) => r.staffEmail === currentStaff.email);

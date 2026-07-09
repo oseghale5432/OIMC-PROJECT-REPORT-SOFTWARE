@@ -24,6 +24,13 @@ export const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+export function getCurrentLagosMonth() {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    timeZone: 'Africa/Lagos',
+  }).format(new Date());
+}
+
 export const generateDefaultProgressReports = (): MonthProgress[] => {
   return [];
 };

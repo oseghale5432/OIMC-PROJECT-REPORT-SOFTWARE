@@ -28,7 +28,8 @@ import {
   DEFAULT_STAFF, 
   DEFAULT_YTD_TASKS, 
   generateDefaultProgressReports,
-  MONTHS
+  MONTHS,
+  getCurrentLagosMonth
 } from './data/mockData';
 import Header from './components/Header';
 import YTDPage from './components/YTDPage';
@@ -179,7 +180,8 @@ export default function App() {
     ];
   });
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
-  const [canProcessPayments, setCanProcessPayments] = useState(false);
+  const [canApprovePayments, setCanApprovePayments] = useState(false);
+  const [canCompletePayments, setCanCompletePayments] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -215,7 +217,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState<string>(() => {
     return localStorage.getItem('oi_current_tab') || 'ytd';
   });
-  const [selectedMonth, setSelectedMonth] = useState<string>('May');
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentLagosMonth);
 
   const handleSimulateEmailChange = (email: string) => {
     setSimulatedEmail(email);
@@ -367,7 +369,8 @@ export default function App() {
   const refreshPayments = useCallback(async () => {
     const result = await ApiClient.loadPayments();
     setPayments(result.payments);
-    setCanProcessPayments(result.canProcess);
+    setCanApprovePayments(result.canApprove);
+    setCanCompletePayments(result.canComplete);
   }, []);
 
   useEffect(() => {
@@ -387,7 +390,8 @@ export default function App() {
     try {
       const result = await ApiClient.createPayment(payment);
       setPayments(result.payments);
-      setCanProcessPayments(result.canProcess);
+      setCanApprovePayments(result.canApprove);
+      setCanCompletePayments(result.canComplete);
     } catch (err: any) {
       setPaymentError(err.message || 'Could not submit payment request.');
       throw err;
@@ -402,7 +406,8 @@ export default function App() {
     try {
       const result = await ApiClient.updatePaymentStatus(id, status);
       setPayments(result.payments);
-      setCanProcessPayments(result.canProcess);
+      setCanApprovePayments(result.canApprove);
+      setCanCompletePayments(result.canComplete);
     } catch (err: any) {
       setPaymentError(err.message || 'Could not update payment status.');
     } finally {
@@ -738,11 +743,12 @@ export default function App() {
         
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 space-y-6 animate-fade-in">
           <div className="text-center space-y-3">
-            <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mx-auto transform hover:rotate-3 transition-transform duration-300">
-              <FileSpreadsheet className="w-9 h-9 text-white" />
-            </div>
+            <img
+              src={new URL('../assets/orange-island-logo-white.png', import.meta.url).href}
+              alt="Orange Island Lagos"
+              className="mx-auto h-20 w-auto max-w-[240px] object-contain"
+            />
             <div className="space-y-1">
-              <span className="font-mono text-xs tracking-widest text-orange-400 font-bold uppercase">Orange Island Resorts</span>
               <h1 className="text-2xl font-bold tracking-tight text-slate-100">Progress Tracker</h1>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
@@ -1183,7 +1189,8 @@ export default function App() {
           {currentTab === 'payment' && (
             <PaymentPage
               payments={payments}
-              canProcess={canProcessPayments}
+              canApprove={canApprovePayments}
+              canComplete={canCompletePayments}
               isSaving={isSavingPayment}
               accountingCodes={accountingCodes}
               error={paymentError}
