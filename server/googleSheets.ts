@@ -1,5 +1,5 @@
 import { requireEnv } from './http';
-import type { MonthProgress, StaffMember, TaskItem, YTDTask } from './types';
+import type { MonthProgress, PaymentRequest, StaffMember, TaskItem, YTDTask } from './types';
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -91,6 +91,63 @@ async function updateRange(range: string, values: string[][]) {
     method: 'PUT',
     body: JSON.stringify({ values }),
   });
+}
+
+async function ensureSheet(title: string) {
+  const metadata = await sheetsFetch('?fields=sheets.properties.title');
+  const exists = (metadata.sheets || []).some((sheet: any) => sheet.properties?.title === title);
+  if (!exists) {
+    await sheetsFetch(':batchUpdate', {
+      method: 'POST',
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
+    });
+  }
+}
+
+export async function fetchPayments(): Promise<PaymentRequest[]> {
+  await ensureSheet('Payments');
+  const data = await sheetsFetch(`/values/${encodeURIComponent('Payments!A1:L5000')}`);
+  return parsePayments(data.values || []);
+}
+
+export async function savePayments(payments: PaymentRequest[]) {
+  await ensureSheet('Payments');
+  const headers = [
+    'Request ID', 'Code', 'Payment', 'Description', 'Amount',
+    'Requested By Email', 'Requested By Name', 'Status',
+    'Submitted At', 'Updated At', 'Updated By', 'Reserved',
+  ];
+  const rows = payments.map((payment) => [
+    payment.id,
+    payment.code,
+    payment.payment,
+    payment.description,
+    String(payment.amount),
+    payment.requestedByEmail,
+    payment.requestedByName,
+    payment.status,
+    payment.submittedAt,
+    payment.updatedAt,
+    payment.updatedBy,
+    '',
+  ]);
+  await updateRange('Payments!A1:L', [headers, ...rows]);
+}
+
+function parsePayments(raw: string[][]): PaymentRequest[] {
+  return raw.slice(1).filter((row) => row[0]).map((row) => ({
+    id: row[0],
+    code: row[1] || '',
+    payment: row[2] || '',
+    description: row[3] || '',
+    amount: Number(row[4] || 0),
+    requestedByEmail: row[5] || '',
+    requestedByName: row[6] || '',
+    status: (row[7] || 'Pending Approval') as PaymentRequest['status'],
+    submittedAt: row[8] || '',
+    updatedAt: row[9] || '',
+    updatedBy: row[10] || '',
+  }));
 }
 
 export async function fetchWorkbook() {

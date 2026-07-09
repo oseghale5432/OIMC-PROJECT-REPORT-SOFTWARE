@@ -23,7 +23,7 @@ import {
   Key,
   User
 } from 'lucide-react';
-import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig } from './types';
+import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig, PaymentRequest, PaymentStatus } from './types';
 import { 
   DEFAULT_STAFF, 
   DEFAULT_YTD_TASKS, 
@@ -34,6 +34,7 @@ import Header from './components/Header';
 import YTDPage from './components/YTDPage';
 import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
+import PaymentPage from './components/PaymentPage';
 import { ApiClient, WorkbookPayload } from './apiClient';
 
 const DEFAULT_CONTRACTOR_HEADS = [
@@ -176,6 +177,9 @@ export default function App() {
       'Waiting Approval by GM', 'Completed', 'Pending'
     ];
   });
+  const [payments, setPayments] = useState<PaymentRequest[]>([]);
+  const [canProcessPayments, setCanProcessPayments] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   const [contractorHeads, setContractorHeads] = useState<string[]>(() => {
     const saved = localStorage.getItem('oi_contractor_heads');
@@ -349,6 +353,48 @@ export default function App() {
 
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshServerWorkbook]);
+
+  const refreshPayments = useCallback(async () => {
+    const result = await ApiClient.loadPayments();
+    setPayments(result.payments);
+    setCanProcessPayments(result.canProcess);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || currentTab !== 'payment') return;
+    refreshPayments().catch((err) => setAuthError(err.message || 'Could not load payments.'));
+    const timer = window.setInterval(() => refreshPayments().catch(() => {}), 30000);
+    return () => window.clearInterval(timer);
+  }, [currentUser, currentTab, refreshPayments]);
+
+  const handleSubmitPayment = async (
+    payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>
+  ) => {
+    setIsSavingPayment(true);
+    try {
+      const result = await ApiClient.createPayment(payment);
+      setPayments(result.payments);
+      setCanProcessPayments(result.canProcess);
+    } catch (err: any) {
+      setAuthError(err.message || 'Could not submit payment request.');
+      throw err;
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
+
+  const handlePaymentStatus = async (id: string, status: PaymentStatus) => {
+    setIsSavingPayment(true);
+    try {
+      const result = await ApiClient.updatePaymentStatus(id, status);
+      setPayments(result.payments);
+      setCanProcessPayments(result.canProcess);
+    } catch (err: any) {
+      setAuthError(err.message || 'Could not update payment status.');
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
 
   // Enforce Row-Level Tab Visibility (Employees cannot access overview page)
   useEffect(() => {
@@ -1115,6 +1161,16 @@ export default function App() {
               isAdmin={isAdmin}
               tasks={tasks}
               statuses={statuses}
+            />
+          )}
+
+          {currentTab === 'payment' && (
+            <PaymentPage
+              payments={payments}
+              canProcess={canProcessPayments}
+              isSaving={isSavingPayment}
+              onSubmit={handleSubmitPayment}
+              onUpdateStatus={handlePaymentStatus}
             />
           )}
         </div>

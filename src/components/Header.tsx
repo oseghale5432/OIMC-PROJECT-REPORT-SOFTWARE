@@ -18,6 +18,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { StaffMember } from '../types';
 
 interface HeaderProps {
@@ -111,6 +112,16 @@ export default function Header({
             )}
 
             {/* My Section Tab */}
+            <button
+              id="tab-payment"
+              onClick={() => handleTabClick('payment')}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
+                currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Banknote className="w-4 h-4" /><span>PAYMENT</span>
+            </button>
+
             <button
               id="tab-personal"
               onClick={() => handleTabClick('personal')}
@@ -283,6 +294,17 @@ export default function Header({
         {showMobileMenu && (
           <div className="md:hidden border-t border-slate-800 py-3 space-y-3">
             <nav className="grid grid-cols-1 gap-2" aria-label="Mobile tabs">
+              <button
+                type="button"
+                onClick={() => handleTabClick('payment')}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                  currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className="flex items-center space-x-2"><Banknote className="w-4 h-4" /><span>Payment</span></span>
+                {currentTab === 'payment' && <CheckCircle className="w-4 h-4" />}
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleTabClick('ytd')}

@@ -49,3 +49,23 @@ export interface SpreadsheetConfig {
   isSynced: boolean;
   lastSyncedAt: string | null;
 }
+
+export type PaymentStatus =
+  | 'Pending Approval'
+  | 'Approved for Processing'
+  | 'Rejected'
+  | 'Payment Made';
+
+export interface PaymentRequest {
+  id: string;
+  code: string;
+  payment: string;
+  description: string;
+  amount: number;
+  requestedByEmail: string;
+  requestedByName: string;
+  status: PaymentStatus;
+  submittedAt: string;
+  updatedAt: string;
+  updatedBy: string;
+}

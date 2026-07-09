@@ -1,4 +1,4 @@
-import { MonthProgress, StaffMember, YTDTask } from './types';
+import { MonthProgress, PaymentRequest, PaymentStatus, StaffMember, YTDTask } from './types';
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
@@ -94,6 +94,24 @@ export const ApiClient = {
     return apiFetch<WorkbookPayload>('/api/staff', {
       method: 'POST',
       body: JSON.stringify({ staff, progressReports }),
+    });
+  },
+
+  loadPayments() {
+    return apiFetch<{ payments: PaymentRequest[]; canProcess: boolean }>('/api/payments');
+  },
+
+  createPayment(payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>) {
+    return apiFetch<{ payments: PaymentRequest[]; canProcess: boolean }>('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'create', payment }),
+    });
+  },
+
+  updatePaymentStatus(id: string, status: PaymentStatus) {
+    return apiFetch<{ payments: PaymentRequest[]; canProcess: boolean }>('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'updateStatus', id, status }),
     });
   },
 };
