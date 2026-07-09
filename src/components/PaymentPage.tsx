@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Banknote, CheckCircle2, Clock3, Send, ShieldCheck, XCircle } from 'lucide-react';
 import type { PaymentRequest, PaymentStatus } from '../types';
+import { splitAccountingCode } from '../data/accountingCodes';
 
 interface PaymentPageProps {
   payments: PaymentRequest[];
   canProcess: boolean;
   isSaving: boolean;
+  accountingCodes: string[];
+  error: string | null;
   onSubmit: (payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>) => Promise<void>;
   onUpdateStatus: (id: string, status: PaymentStatus) => Promise<void>;
 }
@@ -21,6 +24,8 @@ export default function PaymentPage({
   payments,
   canProcess,
   isSaving,
+  accountingCodes,
+  error,
   onSubmit,
   onUpdateStatus,
 }: PaymentPageProps) {
@@ -32,8 +37,12 @@ export default function PaymentPage({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    await onSubmit({ ...form, amount: Number(form.amount) });
-    setForm({ code: '', payment: '', description: '', amount: '' });
+    try {
+      await onSubmit({ ...form, amount: Number(form.amount) });
+      setForm({ code: '', payment: '', description: '', amount: '' });
+    } catch {
+      // The page-level notice displays the API error.
+    }
   };
 
   return (
@@ -52,19 +61,36 @@ export default function PaymentPage({
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">
+          Payment service: {error}
+        </div>
+      )}
+
       {!canProcess && (
         <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="mb-4 font-bold text-slate-800">New payment request</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-semibold text-slate-700">
-              Code
-              <input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
-                className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-orange-500" placeholder="e.g. PR-001" />
+              Accounting code
+              <select required value={form.code} onChange={(e) => {
+                const selectedEntry = accountingCodes.find(
+                  (entry) => splitAccountingCode(entry).code === e.target.value
+                ) || '';
+                const selected = splitAccountingCode(selectedEntry);
+                setForm({ ...form, code: selected.code, payment: selected.payment });
+              }} className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 outline-none focus:border-orange-500">
+                <option value="">Select a code</option>
+                {accountingCodes.map((entry) => {
+                  const item = splitAccountingCode(entry);
+                  return <option key={entry} value={item.code}>{item.code} — {item.payment}</option>;
+                })}
+              </select>
             </label>
             <label className="text-sm font-semibold text-slate-700">
               Payment
-              <input required value={form.payment} onChange={(e) => setForm({ ...form, payment: e.target.value })}
-                className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-orange-500" placeholder="What is being paid for?" />
+              <input required readOnly value={form.payment}
+                className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-slate-600" placeholder="Filled from the selected code" />
             </label>
             <label className="text-sm font-semibold text-slate-700 md:col-span-2">
               Description

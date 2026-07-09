@@ -48,9 +48,11 @@ interface OverviewPageProps {
   departments: string[];
   statuses: string[];
   contractorHeads: string[];
+  accountingCodes: string[];
   onUpdateDepartments: (depts: string[]) => void;
   onUpdateStatuses: (stats: string[]) => void;
   onUpdateContractorHeads: (contractorHeads: string[]) => void;
+  onUpdateAccountingCodes: (accountingCodes: string[]) => void;
 }
 
 export default function OverviewPage({
@@ -66,9 +68,11 @@ export default function OverviewPage({
   departments,
   statuses,
   contractorHeads,
+  accountingCodes,
   onUpdateDepartments,
   onUpdateStatuses,
   onUpdateContractorHeads,
+  onUpdateAccountingCodes,
 }: OverviewPageProps) {
   // Sub-tabs within overview page
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'staff' | 'dropdowns'>('analytics');
@@ -803,6 +807,24 @@ export default function OverviewPage({
                 onUpdateContractorHeads(updatedList);
               }}
               caseTransform="uppercase"
+            />
+          </div>
+
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
+              <FileText className="w-5 h-5 text-violet-500" />
+              <div>
+                <h3 className="font-sans font-bold text-slate-800 text-sm uppercase tracking-wide">
+                  Accounting Codes Manager
+                </h3>
+                <p className="text-[10px] text-slate-400">Format: code — associated payment</p>
+              </div>
+            </div>
+            <DropdownItemManager
+              items={accountingCodes}
+              placeholder="e.g. 400002 — Electricity"
+              onUpdate={onUpdateAccountingCodes}
+              caseTransform="none"
             />
           </div>
         </div>

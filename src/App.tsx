@@ -36,6 +36,7 @@ import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
 import PaymentPage from './components/PaymentPage';
 import { ApiClient, WorkbookPayload } from './apiClient';
+import { DEFAULT_ACCOUNTING_CODES } from './data/accountingCodes';
 
 const DEFAULT_CONTRACTOR_HEADS = [
   'BRICK MORTAR STEEL (BMS)',
@@ -180,10 +181,15 @@ export default function App() {
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
   const [canProcessPayments, setCanProcessPayments] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const [contractorHeads, setContractorHeads] = useState<string[]>(() => {
     const saved = localStorage.getItem('oi_contractor_heads');
     return saved ? JSON.parse(saved) : DEFAULT_CONTRACTOR_HEADS;
+  });
+  const [accountingCodes, setAccountingCodes] = useState<string[]>(() => {
+    const saved = localStorage.getItem('oi_accounting_codes');
+    return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTING_CODES;
   });
 
   const handleUpdateDepartments = (newDepts: string[]) => {
@@ -199,6 +205,10 @@ export default function App() {
   const handleUpdateContractorHeads = (newContractorHeads: string[]) => {
     setContractorHeads(newContractorHeads);
     localStorage.setItem('oi_contractor_heads', JSON.stringify(newContractorHeads));
+  };
+  const handleUpdateAccountingCodes = (newCodes: string[]) => {
+    setAccountingCodes(newCodes);
+    localStorage.setItem('oi_accounting_codes', JSON.stringify(newCodes));
   };
 
   // Navigation & View States
@@ -362,7 +372,9 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser || currentTab !== 'payment') return;
-    refreshPayments().catch((err) => setAuthError(err.message || 'Could not load payments.'));
+    refreshPayments()
+      .then(() => setPaymentError(null))
+      .catch((err) => setPaymentError(err.message || 'Could not load payments.'));
     const timer = window.setInterval(() => refreshPayments().catch(() => {}), 30000);
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshPayments]);
@@ -371,12 +383,13 @@ export default function App() {
     payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>
   ) => {
     setIsSavingPayment(true);
+    setPaymentError(null);
     try {
       const result = await ApiClient.createPayment(payment);
       setPayments(result.payments);
       setCanProcessPayments(result.canProcess);
     } catch (err: any) {
-      setAuthError(err.message || 'Could not submit payment request.');
+      setPaymentError(err.message || 'Could not submit payment request.');
       throw err;
     } finally {
       setIsSavingPayment(false);
@@ -385,12 +398,13 @@ export default function App() {
 
   const handlePaymentStatus = async (id: string, status: PaymentStatus) => {
     setIsSavingPayment(true);
+    setPaymentError(null);
     try {
       const result = await ApiClient.updatePaymentStatus(id, status);
       setPayments(result.payments);
       setCanProcessPayments(result.canProcess);
     } catch (err: any) {
-      setAuthError(err.message || 'Could not update payment status.');
+      setPaymentError(err.message || 'Could not update payment status.');
     } finally {
       setIsSavingPayment(false);
     }
@@ -1145,9 +1159,11 @@ export default function App() {
               departments={departments}
               statuses={statuses}
               contractorHeads={contractorHeads}
+              accountingCodes={accountingCodes}
               onUpdateDepartments={handleUpdateDepartments}
               onUpdateStatuses={handleUpdateStatuses}
               onUpdateContractorHeads={handleUpdateContractorHeads}
+              onUpdateAccountingCodes={handleUpdateAccountingCodes}
             />
           )}
 
@@ -1169,6 +1185,8 @@ export default function App() {
               payments={payments}
               canProcess={canProcessPayments}
               isSaving={isSavingPayment}
+              accountingCodes={accountingCodes}
+              error={paymentError}
               onSubmit={handleSubmitPayment}
               onUpdateStatus={handlePaymentStatus}
             />
