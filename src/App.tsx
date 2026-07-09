@@ -21,7 +21,9 @@ import {
   Lock,
   Mail,
   Key,
-  User
+  User,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig, PaymentRequest, PaymentStatus } from './types';
 import { 
@@ -95,6 +97,10 @@ export default function App() {
   const [firstLoginCurrentPassword, setFirstLoginCurrentPassword] = useState('');
   const [newFirstPassword, setNewFirstPassword] = useState('');
   const [confirmFirstPassword, setConfirmFirstPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showNewFirstPassword, setShowNewFirstPassword] = useState(false);
+  const [showConfirmFirstPassword, setShowConfirmFirstPassword] = useState(false);
 
   const [showTroubleshooter, setShowTroubleshooter] = useState(false);
 
@@ -781,14 +787,21 @@ export default function App() {
                   <Lock className="w-3.5 h-3.5 text-slate-500" />
                   <span>New Custom Password</span>
                 </label>
+                <div className="relative">
                 <input
-                  type="password"
+                  type={showNewFirstPassword ? 'text' : 'password'}
                   required
                   placeholder="At least 6 characters"
                   value={newFirstPassword}
                   onChange={(e) => setNewFirstPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
                 />
+                <button type="button" onClick={() => setShowNewFirstPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                  aria-label={showNewFirstPassword ? 'Hide password' : 'Show password'}>
+                  {showNewFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                </div>
               </div>
 
               <div className="space-y-1.5 text-left">
@@ -796,14 +809,21 @@ export default function App() {
                   <Lock className="w-3.5 h-3.5 text-slate-500" />
                   <span>Confirm Custom Password</span>
                 </label>
+                <div className="relative">
                 <input
-                  type="password"
+                  type={showConfirmFirstPassword ? 'text' : 'password'}
                   required
                   placeholder="Repeat your password"
                   value={confirmFirstPassword}
                   onChange={(e) => setConfirmFirstPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
                 />
+                <button type="button" onClick={() => setShowConfirmFirstPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                  aria-label={showConfirmFirstPassword ? 'Hide password' : 'Show password'}>
+                  {showConfirmFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                </div>
               </div>
 
               <button
@@ -874,14 +894,21 @@ export default function App() {
                   <Key className="w-3.5 h-3.5 text-slate-500" />
                   <span>New Secure Password</span>
                 </label>
+                <div className="relative">
                 <input
-                  type="password"
+                  type={showResetPassword ? 'text' : 'password'}
                   required
                   placeholder="At least 6 characters"
                   value={resetNewPassword}
                   onChange={(e) => setResetNewPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
                 />
+                <button type="button" onClick={() => setShowResetPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                  aria-label={showResetPassword ? 'Hide password' : 'Show password'}>
+                  {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                </div>
               </div>
 
               <button
@@ -938,14 +965,21 @@ export default function App() {
                     Forgot Password?
                   </button>
                 </div>
+                <div className="relative">
                 <input
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
                 />
+                <button type="button" onClick={() => setShowLoginPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}>
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                </div>
               </div>
 
               <button

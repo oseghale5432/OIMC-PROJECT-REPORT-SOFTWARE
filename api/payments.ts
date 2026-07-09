@@ -174,7 +174,8 @@ export default async function handler(req: any, res: any) {
     const profile = staff.find((item: any) => item.email.toLowerCase() === user.email.toLowerCase());
     const canApprove = user.role === 'admin'
       || user.email.toLowerCase() === 'oseghale5432@gmail.com';
-    const canComplete = String(profile?.department || '').toUpperCase().includes('ACCOUNT');
+    const paymentDepartment = String(profile?.department || '').toUpperCase();
+    const canComplete = paymentDepartment.includes('ACCOUNT') || paymentDepartment.includes('FINANCE');
     const canViewAll = canApprove || canComplete;
     let payments = await fetchPayments();
 
@@ -212,7 +213,7 @@ export default async function handler(req: any, res: any) {
           return sendJson(res, 403, { error: 'Only an administrator can approve or reject this request.' });
         }
         if (!canComplete && next === 'Payment Made') {
-          return sendJson(res, 403, { error: 'Only a user in the Accounts department can mark payment as completed.' });
+          return sendJson(res, 403, { error: 'Only a user in the Accounts or Finance department can mark payment as completed.' });
         }
         if (!valid) return sendJson(res, 400, { error: `Cannot change ${current} to ${next}.` });
         payments[index] = { ...payments[index], status: next, updatedAt: new Date().toISOString(), updatedBy: user.email };

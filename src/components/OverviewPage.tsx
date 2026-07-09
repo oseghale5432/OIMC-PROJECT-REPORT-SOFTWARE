@@ -30,7 +30,9 @@ import {
   ShieldCheck,
   Search,
   UserPlus,
-  XCircle
+  XCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { StaffMember, MonthProgress } from '../types';
 import { MONTHS } from '../data/mockData';
@@ -88,6 +90,7 @@ export default function OverviewPage({
   const [newActivity, setNewActivity] = useState('PROJECTS');
   const [newRole, setNewRole] = useState<'staff' | 'admin'>('staff');
   const [newPassword, setNewPassword] = useState('password123');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   const isSuperAdmin = currentUser?.email?.toLowerCase() === 'oseghale5432@gmail.com';
 
@@ -612,14 +615,21 @@ export default function OverviewPage({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Default Password</label>
+                  <div className="relative">
                   <input
-                    type="text"
+                    type={showNewPassword ? 'text' : 'password'}
                     required
                     placeholder="e.g. password123"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-800"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-3 pr-10 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-800"
                   />
+                  <button type="button" onClick={() => setShowNewPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-orange-500"
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}>
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
