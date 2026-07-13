@@ -1,7 +1,7 @@
-import { readJson, sendJson, type ApiRequest, type ApiResponse } from './_server_helpers';
-import { getSessionUser, isAdmin } from './_server_helpers';
-import { getPushTokens, savePushToken } from './_server_helpers';
-import { sendFcmMessage } from './_server_helpers';
+import { readJson, sendJson, type ApiRequest, type ApiResponse } from './_server_helpers.js';
+import { getSessionUser, isAdmin } from './_server_helpers.js';
+import { getPushTokens, savePushToken } from './_server_helpers.js';
+import { sendFcmMessage } from './_server_helpers.js';
 
 function actionName(req: ApiRequest) {
   const url = (req as any).url || '';

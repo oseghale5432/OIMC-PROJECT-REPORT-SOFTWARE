@@ -1,6 +1,6 @@
-import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from './_server_helpers';
-import { createSession, verifyPassword, isHashedPassword, hashPassword, getSessionUser } from './_server_helpers';
-import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from './_server_helpers';
+import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from './_server_helpers.js';
+import { createSession, verifyPassword, isHashedPassword, hashPassword, getSessionUser } from './_server_helpers.js';
+import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from './_server_helpers.js';
 
 function actionName(req: ApiRequest) {
   const url = (req as any).url || '';

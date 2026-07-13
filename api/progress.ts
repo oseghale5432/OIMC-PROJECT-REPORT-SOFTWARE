@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
-import { getPushTokens } from './_server_helpers';
-import { sendFcmMessage } from './_server_helpers';
+import { getPushTokens } from './_server_helpers.js';
+import { sendFcmMessage } from './_server_helpers.js';
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
