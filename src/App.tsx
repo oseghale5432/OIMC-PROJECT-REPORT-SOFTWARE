@@ -39,6 +39,7 @@ import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
 import PaymentPage from './components/PaymentPage';
 import { ApiClient, WorkbookPayload } from './apiClient';
+import { requestNotificationPermission, subscribeToPushNotifications, onForegroundMessage } from './firebaseMessaging';
 import { DEFAULT_ACCOUNTING_CODES } from './data/accountingCodes';
 
 const DEFAULT_CONTRACTOR_HEADS = [
@@ -103,9 +104,35 @@ export default function App() {
   const [showConfirmFirstPassword, setShowConfirmFirstPassword] = useState(false);
 
   const [showTroubleshooter, setShowTroubleshooter] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() =>
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+  const [pushToken, setPushToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('oi_push_token');
+  });
+  const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
     setIsInIframe(window.self !== window.top);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    setNotificationPermission(Notification.permission);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handler = (event: any) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   // App Data States - Load from localStorage if present, else fallback to empty/defaults
@@ -739,6 +766,75 @@ export default function App() {
     }
   };
 
+  const registerNotifications = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotificationStatus('This browser does not support notifications.');
+      return;
+    }
+
+    try {
+      const permission = await requestNotificationPermission();
+      setNotificationPermission(permission);
+      if (permission !== 'granted') {
+        setNotificationStatus('Notifications are blocked or not granted.');
+        return;
+      }
+
+      const token = await subscribeToPushNotifications();
+      if (!token) {
+        setNotificationStatus('Unable to obtain a push notification token.');
+        return;
+      }
+
+      setPushToken(token);
+      localStorage.setItem('oi_push_token', token);
+      await ApiClient.registerPushToken(token);
+      setNotificationStatus('Progress reminder notifications are enabled.');
+    } catch (error: any) {
+      setNotificationStatus(`Notification setup failed: ${error.message || String(error)}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    if (pushToken) {
+      ApiClient.registerPushToken(pushToken).catch(() => {});
+      return;
+    }
+    registerNotifications();
+  }, [currentUser, pushToken, registerNotifications]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubscribe = onForegroundMessage((payload) => {
+      if (payload.notification?.title || payload.notification?.body) {
+        setNotificationStatus(`Reminder received: ${payload.notification.title || ''} ${payload.notification.body || ''}`);
+      }
+    });
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const handleBroadcastReminder = async () => {
+    try {
+      const result = await ApiClient.broadcastNotification(
+        'Update your progress now',
+        'Please update your progress in the app as you complete your tasks.'
+      );
+      alert(`Reminder sent to ${result.delivered} staff.`);
+    } catch (error: any) {
+      alert(`Failed to send reminder: ${error.message || String(error)}`);
+    }
+  };
+
+  const handleInstallApp = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const choiceResult = await deferredInstallPrompt.userChoice;
+    if (choiceResult.outcome === 'accepted') {
+      setDeferredInstallPrompt(null);
+    }
+  };
+
   // If not logged in, render a gorgeous Landing & Login Page
   if (!currentUser) {
     return (
@@ -1065,10 +1161,47 @@ export default function App() {
         isLinkingSheets={isLinkingSheets}
         spreadsheetUrl={sheetsConfig.spreadsheetUrl}
         isAdmin={isActualAdmin}
+        onBroadcastReminder={handleBroadcastReminder}
       />
 
       {/* Main workspace container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        {(notificationStatus || deferredInstallPrompt) && (
+          <div className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm p-4 space-y-3 text-sm text-slate-700">
+            {notificationStatus && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">Notification status</p>
+                  <p className="text-slate-600">{notificationStatus}</p>
+                </div>
+                {notificationPermission !== 'granted' && (
+                  <button
+                    type="button"
+                    onClick={registerNotifications}
+                    className="inline-flex items-center justify-center rounded-full bg-orange-600 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-500 transition-colors"
+                  >
+                    Enable reminders
+                  </button>
+                )}
+              </div>
+            )}
+            {deferredInstallPrompt && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">Install the app</p>
+                  <p className="text-slate-600">Add this tracker to your phone or desktop for faster access.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
+                >
+                  Install App
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Iframe & Auth Error Notice */}
         {(!currentUser && isInIframe) && (

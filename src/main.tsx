@@ -8,3 +8,14 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('Service worker registered for Firebase Messaging.');
+    } catch (error) {
+      console.warn('Service worker registration failed:', error);
+    }
+  });
+}

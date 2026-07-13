@@ -35,6 +35,7 @@ interface HeaderProps {
   isLinkingSheets: boolean;
   spreadsheetUrl: string | null;
   isAdmin: boolean;
+  onBroadcastReminder: () => void;
 }
 
 export default function Header({
@@ -51,6 +52,7 @@ export default function Header({
   isLinkingSheets,
   spreadsheetUrl,
   isAdmin,
+  onBroadcastReminder,
 }: HeaderProps) {
   const [showSimMenu, setShowSimMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -96,18 +98,28 @@ export default function Header({
 
             {/* Overview Only Visible to Admin / Boss */}
             {isAdmin && (
-              <button
-                id="tab-overview"
-                onClick={() => handleTabClick('overview')}
-                className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                  currentTab === 'overview'
-                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span>OVERVIEW</span>
-              </button>
+              <>
+                <button
+                  id="tab-overview"
+                  onClick={() => handleTabClick('overview')}
+                  className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    currentTab === 'overview'
+                      ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>OVERVIEW</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onBroadcastReminder}
+                  className="px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-amber-100 bg-amber-600/10 border border-amber-600/25 hover:bg-amber-600/15"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Send Reminder</span>
+                </button>
+              </>
             )}
 
             {/* My Section Tab */}

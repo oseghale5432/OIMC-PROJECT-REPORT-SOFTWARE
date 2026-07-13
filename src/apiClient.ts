@@ -114,4 +114,18 @@ export const ApiClient = {
       body: JSON.stringify({ action: 'updateStatus', id, status }),
     });
   },
+
+  registerPushToken(token: string) {
+    return apiFetch<{ ok: boolean }>('/api/notifications/register', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  broadcastNotification(title: string, body: string) {
+    return apiFetch<{ delivered: number; results: Array<Record<string, unknown>> }>('/api/notifications/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ title, body }),
+    });
+  },
 };

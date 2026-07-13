@@ -12,7 +12,7 @@ type FirebaseUser = {
   uid: string;
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 
 let authClient: any = null;
 let googleProvider: any = null;

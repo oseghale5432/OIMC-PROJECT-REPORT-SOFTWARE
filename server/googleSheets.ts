@@ -93,15 +93,36 @@ async function updateRange(range: string, values: string[][]) {
   });
 }
 
-async function ensureSheet(title: string) {
-  const metadata = await sheetsFetch('?fields=sheets.properties.title');
-  const exists = (metadata.sheets || []).some((sheet: any) => sheet.properties?.title === title);
-  if (!exists) {
-    await sheetsFetch(':batchUpdate', {
-      method: 'POST',
-      body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
-    });
+export async function savePushToken(email: string, token: string) {
+  await ensureSheet('Push_Tokens');
+
+  const existing = await sheetsFetch(`/values/${encodeURIComponent('Push_Tokens!A1:B5000')}`);
+  const rows: string[][] = existing.values || [];
+  const header = rows[0] || ['Email', 'Push Token'];
+  const bodyRows = rows.slice(1);
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const updatedRows = bodyRows.filter((row: string[]) => row[0]?.toLowerCase() !== normalizedEmail);
+  updatedRows.push([normalizedEmail, token]);
+
+  await updateRange('Push_Tokens!A1:B', [header, ...updatedRows]);
+}
+
+export async function getPushTokens() {
+  await ensureSheet('Push_Tokens');
+  const data = await sheetsFetch(`/values/${encodeURIComponent('Push_Tokens!A1:B5000')}`);
+  const rows: string[][] = data.values || [];
+  const result: Array<{ email: string; token: string }> = [];
+
+  for (const row of rows.slice(1)) {
+    const email = row[0] || '';
+    const token = row[1] || '';
+    if (email && token) {
+      result.push({ email: email.trim().toLowerCase(), token: token.trim() });
+    }
   }
+
+  return result;
 }
 
 export async function fetchPayments(): Promise<PaymentRequest[]> {

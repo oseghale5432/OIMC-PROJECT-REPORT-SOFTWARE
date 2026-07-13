@@ -1,0 +1,22 @@
+{
+  "name": "Orange Island Progress Tracker",
+  "short_name": "OI Tracker",
+  "description": "Staff progress tracker with installable web app support.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f97316",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/assets/orange-island-logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/orange-island-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
