@@ -6,13 +6,19 @@ function pathName(req: ApiRequest) {
   const url = (req as any).url || '';
   try {
     const parsed = new URL(url, 'http://localhost');
-    const slugParam = parsed.searchParams.get('...slug');
+    const slugParam = parsed.searchParams.get('...slug') || parsed.searchParams.get('slug');
     if (slugParam) {
-      return `/${slugParam}`;
+      return Array.isArray(slugParam) ? `/${slugParam.join('/')}` : `/${slugParam}`;
+    }
+    const slugArray = parsed.searchParams.getAll('...slug[]');
+    if (slugArray.length) {
+      return `/${slugArray.join('/')}`;
     }
     if (parsed.pathname && parsed.pathname !== '/') {
       return parsed.pathname;
     }
+    const match = url.match(/\/api\/auth\/(.*)$/);
+    if (match) return `/${match[1]}`;
     return String(url || '');
   } catch {
     return String(url || '');
@@ -21,6 +27,7 @@ function pathName(req: ApiRequest) {
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const pathname = pathName(req);
+  console.log('auth handler route', { pathname, url: (req as any).url, method: req.method, headers: req.headers });
 
   // POST /api/auth/login
   if (pathname.endsWith('/login')) {
