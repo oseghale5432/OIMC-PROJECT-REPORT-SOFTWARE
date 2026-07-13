@@ -26,7 +26,7 @@ export async function subscribeToPushNotifications() {
   }
 
   const messaging = getMessaging(app);
-  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+  const vapidKey = (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY as string | undefined;
   const token = await getToken(messaging, vapidKey ? { vapidKey } : undefined);
   return token || null;
 }

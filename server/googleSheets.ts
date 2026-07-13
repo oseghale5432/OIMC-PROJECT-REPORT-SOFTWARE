@@ -93,6 +93,17 @@ async function updateRange(range: string, values: string[][]) {
   });
 }
 
+async function ensureSheet(title: string) {
+  const metadata = await sheetsFetch('?fields=sheets.properties.title');
+  const exists = (metadata.sheets || []).some((sheet: any) => sheet.properties?.title === title);
+  if (!exists) {
+    await sheetsFetch(':batchUpdate', {
+      method: 'POST',
+      body: JSON.stringify({ requests: [{ addSheet: { properties: { title } } }] }),
+    });
+  }
+}
+
 export async function savePushToken(email: string, token: string) {
   await ensureSheet('Push_Tokens');
 
