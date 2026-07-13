@@ -1,37 +1,27 @@
-import { readJson, sendJson, type ApiRequest, type ApiResponse } from '../../server/http';
-import { getSessionUser, isAdmin } from '../../server/security';
-import { getPushTokens, savePushToken } from '../../server/googleSheets';
-import { sendFcmMessage } from '../../server/firebaseMessaging';
+import { readJson, sendJson, type ApiRequest, type ApiResponse } from '../server/http';
+import { getSessionUser, isAdmin } from '../server/security';
+import { getPushTokens, savePushToken } from '../server/googleSheets';
+import { sendFcmMessage } from '../server/firebaseMessaging';
 
-function pathName(req: ApiRequest) {
+function actionName(req: ApiRequest) {
   const url = (req as any).url || '';
+  const headers = (req.headers || {}) as Record<string, string | string[]>;
   try {
     const parsed = new URL(url, 'http://localhost');
-    const slugParam = parsed.searchParams.get('...slug') || parsed.searchParams.get('slug');
-    if (slugParam) {
-      return Array.isArray(slugParam) ? `/${slugParam.join('/')}` : `/${slugParam}`;
-    }
-    const slugArray = parsed.searchParams.getAll('...slug[]');
-    if (slugArray.length) {
-      return `/${slugArray.join('/')}`;
-    }
-    if (parsed.pathname && parsed.pathname !== '/') {
-      return parsed.pathname;
-    }
-    const match = url.match(/\/api\/notifications\/(.*)$/);
-    if (match) return `/${match[1]}`;
-    return String(url || '');
+    return (
+      String(parsed.searchParams.get('action') || '') ||
+      String(headers['x-action'] || '')
+    ).toLowerCase();
   } catch {
-    return String(url || '');
+    const headers = (req.headers || {}) as Record<string, string | string[]>;
+    return String(headers['x-action'] || '').toLowerCase();
   }
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  const pathname = pathName(req);
-  console.log('notifications handler route', { pathname, url: (req as any).url, method: req.method, headers: req.headers });
+  const action = actionName(req).toLowerCase();
 
-  // POST /api/notifications/register
-  if (pathname.endsWith('/register')) {
+  if (action === 'register') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     const user = getSessionUser(req);
     if (!user) return sendJson(res, 401, { error: 'You must be signed in to register notifications.' });
@@ -48,10 +38,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
   }
 
-  // POST /api/notifications/broadcast
-  if (pathname.endsWith('/broadcast')) {
+  if (action === 'broadcast') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
-
     const user = getSessionUser(req);
     if (!user || !isAdmin(user)) return sendJson(res, 403, { error: 'Admin access is required.' });
 

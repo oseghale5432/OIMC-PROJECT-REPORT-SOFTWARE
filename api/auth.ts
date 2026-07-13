@@ -1,36 +1,26 @@
-import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from '../../server/http';
-import { createSession, verifyPassword, isHashedPassword, hashPassword } from '../../server/security';
-import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from '../../server/googleSheets';
+import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from '../server/http';
+import { createSession, verifyPassword, isHashedPassword, hashPassword } from '../server/security';
+import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from '../server/googleSheets';
 
-function pathName(req: ApiRequest) {
+function actionName(req: ApiRequest) {
   const url = (req as any).url || '';
+  const headers = (req.headers || {}) as Record<string, string | string[]>;
   try {
     const parsed = new URL(url, 'http://localhost');
-    const slugParam = parsed.searchParams.get('...slug') || parsed.searchParams.get('slug');
-    if (slugParam) {
-      return Array.isArray(slugParam) ? `/${slugParam.join('/')}` : `/${slugParam}`;
-    }
-    const slugArray = parsed.searchParams.getAll('...slug[]');
-    if (slugArray.length) {
-      return `/${slugArray.join('/')}`;
-    }
-    if (parsed.pathname && parsed.pathname !== '/') {
-      return parsed.pathname;
-    }
-    const match = url.match(/\/api\/auth\/(.*)$/);
-    if (match) return `/${match[1]}`;
-    return String(url || '');
+    return (
+      String(parsed.searchParams.get('action') || '') ||
+      String(headers['x-action'] || '')
+    ).toLowerCase();
   } catch {
-    return String(url || '');
+    const headers = (req.headers || {}) as Record<string, string | string[]>;
+    return String(headers['x-action'] || '').toLowerCase();
   }
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  const pathname = pathName(req);
-  console.log('auth handler route', { pathname, url: (req as any).url, method: req.method, headers: req.headers });
+  const action = actionName(req).toLowerCase();
 
-  // POST /api/auth/login
-  if (pathname.endsWith('/login')) {
+  if (action === 'login') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
       const { email: rawEmail, password } = await readJson(req) as any;
@@ -70,24 +60,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
   }
 
-  // POST /api/auth/logout
-  if (pathname.endsWith('/logout')) {
+  if (action === 'logout') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     res.setHeader('Set-Cookie', clearSessionCookie());
     return sendJson(res, 200, { ok: true });
   }
 
-  // GET /api/auth/me
-  if (pathname.endsWith('/me')) {
+  if (action === 'me') {
     if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
-    // `getSessionUser` is intentionally not required here to avoid circular import; read cookie server-side elsewhere.
-    const token = (req.headers.cookie || '').toString();
-    // delegate to existing session parsing in other endpoints; here we return 204 if unknown
-    return sendJson(res, 200, { ok: true });
+    const user = { ok: true };
+    return sendJson(res, 200, user);
   }
 
-  // POST /api/auth/reset-password
-  if (pathname.endsWith('/reset-password')) {
+  if (action === 'reset-password') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
       const { email: rawEmail, name: rawName, newPassword } = await readJson(req) as any;
@@ -128,8 +113,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
   }
 
-  // POST /api/auth/change-password
-  if (pathname.endsWith('/change-password')) {
+  if (action === 'change-password') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
     try {
       const body = await readJson(req) as any;

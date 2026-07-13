@@ -1,13 +1,15 @@
 import { MonthProgress, PaymentRequest, PaymentStatus, StaffMember, YTDTask } from './types';
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  } as Record<string, string>;
+
   const res = await fetch(path, {
     credentials: 'include',
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
+    headers,
   });
 
   const responseText = await res.text();
@@ -48,28 +50,34 @@ export const ApiClient = {
       staff?: StaffMember;
       user?: SessionUser;
       workbook?: WorkbookPayload;
-    }>('/api/auth/login', {
+    }>('/api/auth', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+      headers: { 'X-Action': 'login' },
     });
   },
 
   changePassword(email: string, currentPassword: string, newPassword: string) {
-    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth/change-password', {
+    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth', {
       method: 'POST',
       body: JSON.stringify({ email, currentPassword, newPassword }),
+      headers: { 'X-Action': 'change-password' },
     });
   },
 
   resetPassword(email: string, name: string, newPassword: string) {
-    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth/reset-password', {
+    return apiFetch<{ user: SessionUser; workbook: WorkbookPayload }>('/api/auth', {
       method: 'POST',
       body: JSON.stringify({ email, name, newPassword }),
+      headers: { 'X-Action': 'reset-password' },
     });
   },
 
   logout() {
-    return apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
+    return apiFetch<{ ok: boolean }>('/api/auth', {
+      method: 'POST',
+      headers: { 'X-Action': 'logout' },
+    });
   },
 
   loadWorkbook() {
@@ -116,16 +124,18 @@ export const ApiClient = {
   },
 
   registerPushToken(token: string) {
-    return apiFetch<{ ok: boolean }>('/api/notifications/register', {
+    return apiFetch<{ ok: boolean }>('/api/notifications', {
       method: 'POST',
       body: JSON.stringify({ token }),
+      headers: { 'X-Action': 'register' },
     });
   },
 
   broadcastNotification(title: string, body: string) {
-    return apiFetch<{ delivered: number; results: Array<Record<string, unknown>> }>('/api/notifications/broadcast', {
+    return apiFetch<{ delivered: number; results: Array<Record<string, unknown>> }>('/api/notifications', {
       method: 'POST',
       body: JSON.stringify({ title, body }),
+      headers: { 'X-Action': 'broadcast' },
     });
   },
 };
