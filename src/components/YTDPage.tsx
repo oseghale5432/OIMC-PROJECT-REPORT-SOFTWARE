@@ -121,12 +121,13 @@ export default function YTDPage({
 
   const handleSaveEdit = () => {
     if (editingTask) {
-      // Calculate Days Remaining dynamically based on due date
+      // Calculate Days Remaining as difference between due date and today
       const due = new Date(editingTask.dueDate);
-      const start = new Date(editingTask.startDate);
-      const diffTime = due.getTime() - start.getTime();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffTime = due.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       onUpdateTask({
         ...editingTask,
         daysRemaining: diffDays > 0 ? diffDays : 0,

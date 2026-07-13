@@ -627,8 +627,9 @@ export default function App() {
   // Add YTD Task
   const handleAddTask = async (newTask: Omit<YTDTask, 'id' | 'daysRemaining'>) => {
     const due = new Date(newTask.dueDate);
-    const start = new Date(newTask.startDate);
-    const diffTime = due.getTime() - start.getTime();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = due.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     const task: YTDTask = {

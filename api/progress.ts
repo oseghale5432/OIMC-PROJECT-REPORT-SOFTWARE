@@ -1,4 +1,6 @@
 import * as crypto from 'crypto';
+import { getPushTokens } from '../server/googleSheets';
+import { sendFcmMessage } from '../server/firebaseMessaging';
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -332,16 +334,48 @@ export default async function handler(req: any, res: any) {
     );
 
     let updatedTasks = workbook.ytdTasks;
+    const changedStatuses: Array<{ id: string; description: string; oldStatus: string; newStatus: string }> = [];
     if (body.ytdTasks) {
       if (isAdmin(user)) {
         updatedTasks = body.ytdTasks;
       } else {
         updatedTasks = workbook.ytdTasks.map((task) => {
           const replacement = body.ytdTasks?.find((t: YTDTask) => t.id === task.id);
+          if (replacement && replacement.status !== task.status) {
+            changedStatuses.push({ id: task.id, description: task.description, oldStatus: task.status, newStatus: replacement.status });
+          }
           return replacement ? { ...task, status: replacement.status, remark: replacement.remark } : task;
         });
       }
+
       await saveYTDTasks(updatedTasks);
+
+      // Notify admins when staff change a task status
+      if (changedStatuses.length > 0 && !isAdmin(user)) {
+        try {
+          const tokens = await getPushTokens();
+          const adminEmails = (workbook.staff || []).filter((s) => s.role === 'admin').map((s) => (s.email || '').toLowerCase());
+          const adminTokens = tokens.filter((t) => adminEmails.includes(t.email.toLowerCase()));
+
+          if (adminTokens.length > 0) {
+            const details = changedStatuses.map((c) => `${c.description} → ${c.newStatus}`).join('; ');
+            const title = `${user.displayName || user.email} updated task status`;
+            const message = `${user.displayName || user.email} updated ${changedStatuses.length} task(s): ${details}`;
+
+            await Promise.all(
+              adminTokens.map(async (entry) => {
+                try {
+                  await sendFcmMessage(entry.token, title, message, { email: entry.email, actor: user.email });
+                } catch (err) {
+                  // ignore individual send errors
+                }
+              })
+            );
+          }
+        } catch (err) {
+          console.warn('Failed to send admin notifications:', err);
+        }
+      }
     }
 
     await saveProgressReports(updatedReports);
