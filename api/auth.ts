@@ -1,6 +1,6 @@
-import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from './server/http';
-import { createSession, verifyPassword, isHashedPassword, hashPassword } from './server/security';
-import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from './server/googleSheets';
+import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from '../server/http';
+import { createSession, verifyPassword, isHashedPassword, hashPassword } from '../server/security';
+import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from '../server/googleSheets';
 
 function actionName(req: ApiRequest) {
   const url = (req as any).url || '';
