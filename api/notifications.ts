@@ -18,7 +18,7 @@ function actionName(req: ApiRequest) {
   }
 }
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
+async function innerHandler(req: ApiRequest, res: ApiResponse) {
   const action = actionName(req).toLowerCase();
 
   if (action === 'register') {
@@ -71,4 +71,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   }
 
   return sendJson(res, 404, { error: 'Not found' });
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
+  try {
+    return await innerHandler(req, res);
+  } catch (err: any) {
+    try { console.error(err); } catch {}
+    return sendJson(res, 500, { error: String(err?.message || 'Unhandled error'), stack: String(err?.stack || '') });
+  }
 }
