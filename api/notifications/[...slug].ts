@@ -6,7 +6,15 @@ import { sendFcmMessage } from '../../server/firebaseMessaging';
 function pathName(req: ApiRequest) {
   const url = (req as any).url || '';
   try {
-    return new URL(url, 'http://localhost').pathname;
+    const parsed = new URL(url, 'http://localhost');
+    const slugParam = parsed.searchParams.get('...slug');
+    if (slugParam) {
+      return `/${slugParam}`;
+    }
+    if (parsed.pathname && parsed.pathname !== '/') {
+      return parsed.pathname;
+    }
+    return String(url || '');
   } catch {
     return String(url || '');
   }
