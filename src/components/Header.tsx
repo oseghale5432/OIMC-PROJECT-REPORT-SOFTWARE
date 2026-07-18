@@ -159,7 +159,7 @@ export default function Header({
               {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            {/* Google Sheets Status */}
+            {/* Firestore Status */}
             {currentUser?.role === 'admin' && (
               <div className="hidden lg:flex items-center space-x-2">
                 {isSheetsLinked ? (
@@ -171,7 +171,7 @@ export default function Header({
                   >
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <Database className="w-3.5 h-3.5" />
-                    <span>Sheets Database Active</span>
+                    <span>Firestore Database Active</span>
                   </a>
                 ) : (
                   <button
@@ -373,7 +373,7 @@ export default function Header({
                     <span className="flex items-center space-x-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                       <Database className="w-4 h-4" />
-                      <span>Sheets Database Active</span>
+                      <span>Firestore Database Active</span>
                     </span>
                   </a>
                 ) : (

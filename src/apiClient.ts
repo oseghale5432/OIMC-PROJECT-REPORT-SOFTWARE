@@ -33,7 +33,7 @@ export interface WorkbookPayload {
   ytdTasks: YTDTask[];
   staff: StaffMember[];
   progressReports: MonthProgress[];
-  spreadsheetId?: string;
+  databaseId?: string;
 }
 
 export interface SessionUser {

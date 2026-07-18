@@ -286,10 +286,8 @@ export default function App() {
     setProgressReports(workbook.progressReports || []);
     setSheetsConfig((prev) => ({
       ...prev,
-      spreadsheetId: workbook.spreadsheetId || prev.spreadsheetId || 'server-managed',
-      spreadsheetUrl: workbook.spreadsheetId
-        ? `https://docs.google.com/spreadsheets/d/${workbook.spreadsheetId}/edit`
-        : prev.spreadsheetUrl,
+      spreadsheetId: workbook.databaseId || prev.spreadsheetId || 'firestore',
+      spreadsheetUrl: null,
       isSynced: true,
       lastSyncedAt: new Date().toLocaleTimeString(),
     }));
@@ -582,21 +580,21 @@ export default function App() {
     });
   };
 
-  // Load the one server-managed Google Sheets database configured in Vercel.
+  // Load the server-managed Firestore database configured in Vercel.
   const handleLinkSheets = async () => {
     setIsLinkingSheets(true);
     try {
       await refreshServerWorkbook();
-      alert('Server-managed Google Sheets database loaded. Admins and employees are now using the same sheet.');
+      alert('Firestore database loaded. Admins and employees are now using the same live database.');
     } catch (err: any) {
-      console.error('Failed to load server-managed sheet:', err);
-      alert(`Could not load the server-managed Google Sheet. Check Vercel env GOOGLE_SHEETS_SPREADSHEET_ID and service account access. Details: ${err.message || err}`);
+      console.error('Failed to load Firestore:', err);
+      alert(`Could not load Firestore. Check the Firebase service-account environment variables. Details: ${err.message || err}`);
     } finally {
       setIsLinkingSheets(false);
     }
   };
 
-  // Push updates to Google Sheet
+  // Push updates to Firestore.
   const syncUpdatesToGoogleSheet = async (
     updatedTasks?: YTDTask[],
     updatedReports?: MonthProgress[]
@@ -618,7 +616,7 @@ export default function App() {
       }));
     } catch (err: any) {
       console.error('Error syncing updates to sheet:', err);
-      alert(`Could not sync changes to the server-managed Google Sheet: ${err.message || err}`);
+      alert(`Could not sync changes to Firestore: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
     }
@@ -641,7 +639,7 @@ export default function App() {
     const updatedTasks = [...tasks, task];
     setTasks(updatedTasks);
 
-    // Logged-in users save through the server-managed Google Sheet.
+    // Logged-in users save through Firestore.
     if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
@@ -652,7 +650,7 @@ export default function App() {
     const updatedTasks = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     setTasks(updatedTasks);
 
-    // Logged-in users save through the server-managed Google Sheet.
+    // Logged-in users save through Firestore.
     if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
@@ -663,7 +661,7 @@ export default function App() {
     const updatedTasks = tasks.filter((t) => t.id !== id);
     setTasks(updatedTasks);
 
-    // Logged-in users save through the server-managed Google Sheet.
+    // Logged-in users save through Firestore.
     if (currentUser) {
       await syncUpdatesToGoogleSheet(updatedTasks, undefined);
     }
@@ -683,7 +681,7 @@ export default function App() {
       setTasks(updatedYTDTasks);
     }
 
-    // Logged-in users save through the server-managed Google Sheet.
+    // Logged-in users save through Firestore.
     if (currentUser) {
       setIsSyncing(true);
       try {
@@ -691,7 +689,7 @@ export default function App() {
         applyServerWorkbook(workbook);
       } catch (err: any) {
         console.error('Error saving progress through server:', err);
-        alert(`Could not save progress to Google Sheets: ${err.message || err}`);
+        alert(`Could not save progress to Firestore: ${err.message || err}`);
       } finally {
         setIsSyncing(false);
       }
@@ -721,13 +719,13 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Logged-in admins save staff through the server-managed Google Sheet.
+    // Logged-in admins save staff through Firestore.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not save staff profile to Google Sheets: ${err.message || err}`);
+        alert(`Could not save staff profile to Firestore: ${err.message || err}`);
       }
     }
   };
@@ -737,13 +735,13 @@ export default function App() {
     const updatedStaffList = staffList.map(s => s.email === updatedStaff.email ? updatedStaff : s);
     setStaffList(updatedStaffList);
 
-    // Logged-in admins save staff through the server-managed Google Sheet.
+    // Logged-in admins save staff through Firestore.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not update staff profile in Google Sheets: ${err.message || err}`);
+        alert(`Could not update staff profile in Firestore: ${err.message || err}`);
       }
     }
   };
@@ -756,13 +754,13 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Logged-in admins save staff through the server-managed Google Sheet.
+    // Logged-in admins save staff through Firestore.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not delete staff profile from Google Sheets: ${err.message || err}`);
+        alert(`Could not delete staff profile from Firestore: ${err.message || err}`);
       }
     }
   };
@@ -1274,10 +1272,10 @@ export default function App() {
             <div className="space-y-1">
               <h3 className="font-sans font-extrabold text-base flex items-center space-x-2">
                 <Database className="w-5 h-5 animate-bounce" />
-                <span>Server Sheets Database Not Loaded</span>
+                <span>Firestore Database Not Loaded</span>
               </h3>
               <p className="text-sm text-orange-50">
-                Load the shared Google Sheet configured in Vercel. Admins and employees must use this same database.
+                Load the shared Firestore project configured in Vercel. Admins and employees use this same database.
               </p>
             </div>
             <button
@@ -1299,7 +1297,7 @@ export default function App() {
         {isSyncing && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white border border-slate-700 px-4 py-2 rounded-full text-xs font-semibold shadow-2xl flex items-center space-x-2 z-50">
             <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-400" />
-            <span>Syncing database with Google Sheets...</span>
+            <span>Syncing database with Firestore...</span>
           </div>
         )}
 
@@ -1374,7 +1372,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>&copy; 2026 Orange Island Resorts. All Rights Reserved.</span>
           <div className="flex space-x-4">
-            <span className="text-slate-400 font-mono">Status: {sheetsConfig.spreadsheetId ? 'Online (Google Sheets DB)' : 'Local Offline Mode'}</span>
+            <span className="text-slate-400 font-mono">Status: {sheetsConfig.spreadsheetId ? 'Online (Firestore DB)' : 'Local Offline Mode'}</span>
             {sheetsConfig.lastSyncedAt && (
               <span className="text-slate-400 font-mono">Last Sync: {sheetsConfig.lastSyncedAt}</span>
             )}
