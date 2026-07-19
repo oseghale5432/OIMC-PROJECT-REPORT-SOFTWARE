@@ -3,37 +3,6 @@ import type { MonthProgress, PaymentRequest, StaffMember, TaskItem, YTDTask } fr
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 let cachedToken: { value: string; expiresAt: number } | null = null;
-const RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
-
-function isRetryableNetworkError(error: any) {
-  const code = error?.cause?.code || error?.code;
-  return (
-    error instanceof TypeError ||
-    code === 'UND_ERR_CONNECT_TIMEOUT' ||
-    code === 'ETIMEDOUT' ||
-    code === 'ECONNRESET' ||
-    code === 'EAI_AGAIN'
-  );
-}
-
-async function fetchWithRetry(url: string, init: RequestInit = {}) {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-    try {
-      const response = await fetch(url, init);
-      if (response.status < 500 || attempt === RETRY_DELAYS_MS.length) return response;
-      lastError = new Error(`Google API temporarily returned HTTP ${response.status}.`);
-    } catch (error) {
-      lastError = error;
-      if (!isRetryableNetworkError(error) || attempt === RETRY_DELAYS_MS.length) throw error;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
-  }
-
-  throw lastError;
-}
 
 function base64url(input: string) {
   return Buffer.from(input)
@@ -74,7 +43,7 @@ async function getServiceAccountAccessToken() {
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 
-  const res = await fetchWithRetry('https://oauth2.googleapis.com/token', {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -101,7 +70,7 @@ export function getSpreadsheetId() {
 
 async function sheetsFetch(path: string, init: RequestInit = {}) {
   const token = await getServiceAccountAccessToken();
-  const res = await fetchWithRetry(`${API_BASE}/${getSpreadsheetId()}${path}`, {
+  const res = await fetch(`${API_BASE}/${getSpreadsheetId()}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,

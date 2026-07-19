@@ -11,14 +11,14 @@ function base64url(input: Buffer | string) {
 }
 
 function getServiceAccountEmail() {
-  const value = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  if (!value) throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_EMAIL');
+  const value = process.env.FIREBASE_CLIENT_EMAIL || process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  if (!value) throw new Error('Missing FIREBASE_CLIENT_EMAIL');
   return value;
 }
 
 function getPrivateKey() {
-  const value = process.env.GOOGLE_PRIVATE_KEY;
-  if (!value) throw new Error('Missing GOOGLE_PRIVATE_KEY');
+  const value = process.env.FIREBASE_PRIVATE_KEY || process.env.GOOGLE_PRIVATE_KEY;
+  if (!value) throw new Error('Missing FIREBASE_PRIVATE_KEY');
   return value.replace(/\\n/g, '\n');
 }
 
