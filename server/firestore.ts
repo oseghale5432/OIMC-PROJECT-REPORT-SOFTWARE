@@ -3,7 +3,11 @@ import { getFirestore, type CollectionReference, type DocumentData } from 'fireb
 import type { MonthProgress, PaymentRequest, StaffMember, YTDTask } from './types';
 
 function projectId() {
-  return process.env.FIREBASE_PROJECT_ID || 'gen-lang-client-0436225283';
+  const value = process.env.FIREBASE_PROJECT_ID?.trim();
+  if (!value) {
+    throw new Error('Missing FIREBASE_PROJECT_ID environment variable.');
+  }
+  return value;
 }
 
 function adminApp() {
@@ -39,8 +43,18 @@ function clean<T>(value: T): T {
 }
 
 async function readCollection<T>(name: string): Promise<T[]> {
-  const snapshot = await db().collection(name).get();
-  return snapshot.docs.map((document) => document.data() as T);
+  try {
+    const snapshot = await db().collection(name).get();
+    return snapshot.docs.map((document) => document.data() as T);
+  } catch (error: any) {
+    if (String(error?.code || '').includes('permission-denied') || String(error?.message || '').includes('PERMISSION_DENIED')) {
+      throw new Error(
+        `Firestore permission denied while reading "${name}" in project "${projectId()}". ` +
+          'Check that FIREBASE_PROJECT_ID matches the migrated Firebase project and that FIREBASE_CLIENT_EMAIL has Firestore access.'
+      );
+    }
+    throw error;
+  }
 }
 
 async function replaceCollection<T extends DocumentData>(

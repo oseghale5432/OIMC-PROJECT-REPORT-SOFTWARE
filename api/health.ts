@@ -6,6 +6,8 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const firebaseClientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
+
   res.statusCode = 200;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({
@@ -15,6 +17,12 @@ export default async function handler(req: any, res: any) {
       FIREBASE_CLIENT_EMAIL: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
       FIREBASE_PRIVATE_KEY: Boolean(process.env.FIREBASE_PRIVATE_KEY),
       SESSION_SECRET: Boolean(process.env.SESSION_SECRET),
+    },
+    firebase: {
+      projectId: process.env.FIREBASE_PROJECT_ID || null,
+      clientEmail: firebaseClientEmail
+        ? firebaseClientEmail.replace(/^(.{3}).*(@.*)$/, '$1...$2')
+        : null,
     },
   }));
 }
