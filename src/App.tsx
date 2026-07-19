@@ -392,7 +392,7 @@ export default function App() {
     refreshServerWorkbook({ silent: true }).catch(() => {});
     const timer = window.setInterval(() => {
       refreshServerWorkbook({ silent: true }).catch(() => {});
-    }, 30000);
+    }, 300000);
 
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshServerWorkbook]);
@@ -409,7 +409,7 @@ export default function App() {
     refreshPayments()
       .then(() => setPaymentError(null))
       .catch((err) => setPaymentError(err.message || 'Could not load payments.'));
-    const timer = window.setInterval(() => refreshPayments().catch(() => {}), 30000);
+    const timer = window.setInterval(() => refreshPayments().catch(() => {}), 300000);
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshPayments]);
 

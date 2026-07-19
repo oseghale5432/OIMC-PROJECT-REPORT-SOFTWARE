@@ -1,32 +1,51 @@
-importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js');
+// Service worker for handling background push notifications natively.
+// This works reliably with Firebase Cloud Messaging (FCM) Web Push payloads.
 
-const firebaseConfig = {
-  projectId: 'gen-lang-client-0436225283',
-  appId: '1:3960761774:web:5e4a276e995304e3df6c3f',
-  apiKey: 'AIzaSyBI2x9grLH5qjzCgOXepKHxiFM2flXLXj8',
-  authDomain: 'gen-lang-client-0436225283.firebaseapp.com',
-  storageBucket: 'gen-lang-client-0436225283.firebasestorage.app',
-  messagingSenderId: '3960761774',
-  measurementId: '',
-};
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
 
-firebase.initializeApp(firebaseConfig);
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
-const messaging = firebase.messaging();
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
 
-messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || 'Orange Island Progress Tracker';
-  const notificationOptions = {
-    body: payload.notification?.body || 'Please update your progress in the app.',
-    icon: '/assets/orange-island-logo.png',
-    data: payload.data,
-  };
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  try {
+    const payload = event.data.json();
+    
+    // Parse notification attributes from FCM structure
+    const title = payload.notification?.title || payload.data?.title || 'Orange Island Progress Tracker';
+    const body = payload.notification?.body || payload.data?.body || 'Please update your progress in the app.';
+    const icon = payload.notification?.icon || '/assets/orange-island-logo.png';
+    const data = payload.data || {};
+
+    const options = {
+      body,
+      icon,
+      badge: '/assets/orange-island-logo.png',
+      data,
+      vibrate: [100, 50, 100],
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (error) {
+    console.error('Error parsing push event data:', error);
+    // Fallback if the payload is text or fails to parse as JSON
+    event.waitUntil(
+      self.registration.showNotification('Orange Island Progress Tracker', {
+        body: event.data.text() || 'Please check the tracker for updates.',
+        icon: '/assets/orange-island-logo.png',
+      })
+    );
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  
+  // Open the app window or focus it if already open
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
