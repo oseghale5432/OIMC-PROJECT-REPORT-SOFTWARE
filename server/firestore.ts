@@ -19,6 +19,35 @@ async function runWithFallback<T>(firestoreOp: () => Promise<T>, sheetsOp: () =>
   }
 }
 
+async function runWithBackup(
+  firestoreWrite: () => Promise<unknown>,
+  sheetsWrite: () => Promise<unknown>
+): Promise<void> {
+  let firestoreSucceeded = false;
+  try {
+    await firestoreWrite();
+    firestoreSucceeded = true;
+  } catch (error: any) {
+    const isQuotaExceeded =
+      String(error?.message || '').includes('RESOURCE_EXHAUSTED') ||
+      String(error?.message || '').includes('Quota exceeded') ||
+      String(error?.message || '').includes('8');
+    if (!isQuotaExceeded) {
+      throw error;
+    }
+    console.warn('Firestore quota exceeded. Writing only to Google Sheets backup...');
+  }
+
+  try {
+    await sheetsWrite();
+  } catch (sheetsError) {
+    console.error('Google Sheets backup write failed:', sheetsError);
+    if (!firestoreSucceeded) {
+      throw sheetsError;
+    }
+  }
+}
+
 function projectId() {
   const value = process.env.FIREBASE_PROJECT_ID?.trim();
   if (!value) {
@@ -122,14 +151,14 @@ export async function fetchWorkbook() {
 }
 
 export async function saveYTDTasks(tasks: YTDTask[]) {
-  await runWithFallback(
+  await runWithBackup(
     () => replaceCollection(db().collection(collections.ytdTasks), tasks, (task) => task.id),
     () => googleSheets.saveYTDTasks(tasks)
   );
 }
 
 export async function saveStaffProfiles(staff: StaffMember[]) {
-  await runWithFallback(
+  await runWithBackup(
     () => replaceCollection(
       db().collection(collections.staff),
       staff.map((member) => ({ ...member, email: member.email.trim().toLowerCase() })),
@@ -140,7 +169,7 @@ export async function saveStaffProfiles(staff: StaffMember[]) {
 }
 
 export async function saveProgressReports(reports: MonthProgress[]) {
-  await runWithFallback(
+  await runWithBackup(
     () => replaceCollection(db().collection(collections.progressReports), reports, (report) => report.id),
     () => googleSheets.saveProgressReports(reports)
   );
@@ -154,7 +183,7 @@ export async function fetchPayments(): Promise<PaymentRequest[]> {
 }
 
 export async function savePayments(payments: PaymentRequest[]) {
-  await runWithFallback(
+  await runWithBackup(
     () => replaceCollection(db().collection(collections.payments), payments, (payment) => payment.id),
     () => googleSheets.savePayments(payments)
   );
@@ -162,7 +191,7 @@ export async function savePayments(payments: PaymentRequest[]) {
 
 export async function savePushToken(email: string, token: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  await runWithFallback(
+  await runWithBackup(
     async () => {
       await db().collection(collections.pushTokens).doc(normalizedEmail).set({
         email: normalizedEmail,
@@ -196,21 +225,21 @@ export async function fetchNotifications(): Promise<AppNotification[]> {
 }
 
 export async function addNotification(notification: AppNotification) {
-  await runWithFallback(
+  await runWithBackup(
     async () => { await db().collection(collections.notifications).doc(notification.id).set(clean(notification)); },
     () => googleSheets.addNotification(notification)
   );
 }
 
 export async function markNotificationAsRead(id: string) {
-  await runWithFallback(
+  await runWithBackup(
     async () => { await db().collection(collections.notifications).doc(id).update({ isRead: true }); },
     () => googleSheets.markNotificationAsRead(id)
   );
 }
 
 export async function markAllNotificationsAsRead(userEmail: string, isAdmin: boolean, isAccounts: boolean) {
-  await runWithFallback(
+  await runWithBackup(
     async () => {
       const collection = db().collection(collections.notifications);
       const snapshot = await collection.get();

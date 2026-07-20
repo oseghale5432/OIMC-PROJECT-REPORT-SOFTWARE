@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "migrate:firestore": "tsx scripts/migrate-google-sheets-to-firestore.ts"
+    "migrate:firestore": "tsx scripts/migrate-google-sheets-to-firestore.ts",
+    "sync:sheets": "tsx scripts/sync-firestore-to-google-sheets.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
