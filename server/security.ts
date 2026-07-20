@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { getCookie, requireEnv, type ApiRequest } from './http';
+import { getCookie, requireEnv, type ApiRequest } from './http.js';
 import type { SessionUser } from './types';
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;

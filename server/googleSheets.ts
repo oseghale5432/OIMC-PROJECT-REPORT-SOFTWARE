@@ -1,4 +1,4 @@
-import { requireEnv } from './http';
+import { requireEnv } from './http.js';
 import type { MonthProgress, PaymentRequest, StaffMember, TaskItem, YTDTask, AppNotification } from './types';
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
