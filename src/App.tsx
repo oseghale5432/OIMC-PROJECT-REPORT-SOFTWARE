@@ -469,12 +469,7 @@ export default function App() {
     }
   };
 
-  // Enforce Row-Level Tab Visibility (Employees cannot access overview page)
-  useEffect(() => {
-    if (!isActualAdmin && currentTab === 'overview') {
-      handleTabChange('ytd');
-    }
-  }, [simulatedEmail, currentTab, isActualAdmin]);
+
 
   // Custom Login Flow Handler
   const handleCustomLogin = async (e: React.FormEvent) => {
@@ -1342,7 +1337,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'overview' && isActualAdmin && (
+          {currentTab === 'overview' && (
             <OverviewPage
               staffList={staffList}
               progressReports={progressReports}

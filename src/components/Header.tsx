@@ -99,30 +99,28 @@ export default function Header({
               <span>2026 YTD TASKS</span>
             </button>
 
-            {/* Overview Only Visible to Admin / Boss */}
+            <button
+              id="tab-overview"
+              onClick={() => handleTabClick('overview')}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
+                currentTab === 'overview'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span>OVERVIEW</span>
+            </button>
+
             {isAdmin && (
-              <>
-                <button
-                  id="tab-overview"
-                  onClick={() => handleTabClick('overview')}
-                  className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                    currentTab === 'overview'
-                      ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  <span>OVERVIEW</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={onBroadcastReminder}
-                  className="px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-amber-100 bg-amber-600/10 border border-amber-600/25 hover:bg-amber-600/15"
-                >
-                  <Shield className="w-4 h-4" />
-                  <span>Send Reminder</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={onBroadcastReminder}
+                className="px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-amber-100 bg-amber-600/10 border border-amber-600/25 hover:bg-amber-600/15"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Send Reminder</span>
+              </button>
             )}
 
             {/* My Section Tab */}
@@ -355,23 +353,21 @@ export default function Header({
                 {currentTab === 'ytd' && <CheckCircle className="w-4 h-4" />}
               </button>
 
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => handleTabClick('overview')}
-                  className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                    currentTab === 'overview'
-                      ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                      : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                  }`}
-                >
-                  <span className="flex items-center space-x-2">
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>Overview</span>
-                  </span>
-                  {currentTab === 'overview' && <CheckCircle className="w-4 h-4" />}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleTabClick('overview')}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                  currentTab === 'overview'
+                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className="flex items-center space-x-2">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Overview</span>
+                </span>
+                {currentTab === 'overview' && <CheckCircle className="w-4 h-4" />}
+              </button>
 
               <button
                 type="button"

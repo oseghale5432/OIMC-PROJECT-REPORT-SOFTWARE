@@ -93,6 +93,8 @@ export default function OverviewPage({
   const [showNewPassword, setShowNewPassword] = useState(false);
 
   const isSuperAdmin = currentUser?.email?.toLowerCase() === 'oseghale5432@gmail.com';
+  const loggedInStaffProfile = staffList.find((s) => s.email.toLowerCase() === currentUser?.email?.toLowerCase());
+  const isAdmin = !currentUser || isSuperAdmin || loggedInStaffProfile?.role === 'admin';
 
   const handleDeptChange = (dept: string) => {
     setNewDept(dept);
@@ -262,32 +264,36 @@ export default function OverviewPage({
             <span>REAL-TIME PERFORMANCE ANALYTICS</span>
           </div>
         </button>
-        <button
-          onClick={() => setActiveSubTab('staff')}
-          className={`pb-3 px-6 font-sans text-sm font-bold tracking-wide border-b-2 transition-all ${
-            activeSubTab === 'staff'
-              ? 'border-orange-500 text-orange-600'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <div className="flex items-center space-x-2">
-            <Users className="w-4 h-4" />
-            <span>STAFF & ADMINS ROSTER</span>
-          </div>
-        </button>
-        <button
-          onClick={() => setActiveSubTab('dropdowns')}
-          className={`pb-3 px-6 font-sans text-sm font-bold tracking-wide border-b-2 transition-all ${
-            activeSubTab === 'dropdowns'
-              ? 'border-orange-500 text-orange-600'
-              : 'border-transparent text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <div className="flex items-center space-x-2">
-            <Layers className="w-4 h-4" />
-            <span>SYSTEM DROPDOWNS CONFIG</span>
-          </div>
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              onClick={() => setActiveSubTab('staff')}
+              className={`pb-3 px-6 font-sans text-sm font-bold tracking-wide border-b-2 transition-all ${
+                activeSubTab === 'staff'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Users className="w-4 h-4" />
+                <span>STAFF & ADMINS ROSTER</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('dropdowns')}
+              className={`pb-3 px-6 font-sans text-sm font-bold tracking-wide border-b-2 transition-all ${
+                activeSubTab === 'dropdowns'
+                  ? 'border-orange-500 text-orange-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <Layers className="w-4 h-4" />
+                <span>SYSTEM DROPDOWNS CONFIG</span>
+              </div>
+            </button>
+          </>
+        )}
       </div>
 
       {activeSubTab === 'analytics' && (
@@ -528,7 +534,7 @@ export default function OverviewPage({
         </div>
       )}
 
-      {activeSubTab === 'staff' && (
+      {activeSubTab === 'staff' && isAdmin && (
         <div className="space-y-6">
           {/* Header Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -752,7 +758,7 @@ export default function OverviewPage({
         </div>
       )}
 
-      {activeSubTab === 'dropdowns' && (
+      {activeSubTab === 'dropdowns' && isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {/* Departments Manager */}
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
