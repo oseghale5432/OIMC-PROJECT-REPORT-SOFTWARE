@@ -89,6 +89,7 @@ export default function App() {
   // Custom login forms and credentials states
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetName, setResetName] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
@@ -483,6 +484,7 @@ export default function App() {
       return;
     }
 
+    setIsLoggingIn(true);
     try {
       const result = await ApiClient.login(email, password);
 
@@ -490,6 +492,7 @@ export default function App() {
         setFirstLoginStaff(result.staff);
         setFirstLoginCurrentPassword(password);
         setIsFirstLoginMode(true);
+        setIsLoggingIn(false);
         return;
       }
 
@@ -503,6 +506,8 @@ export default function App() {
       }
     } catch (err: any) {
       setAuthError(`Access Denied: ${err.message || 'Login failed.'}`);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -525,6 +530,7 @@ export default function App() {
       return;
     }
 
+    setIsLoggingIn(true);
     try {
       const result = await ApiClient.changePassword(firstLoginStaff.email, firstLoginCurrentPassword, pass);
       setCurrentUser(result.user);
@@ -541,6 +547,8 @@ export default function App() {
       alert('Your secure custom password has been registered successfully! Welcome to the Progress Tracker portal.');
     } catch (err: any) {
       setAuthError(err.message || 'Password setup failed.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -563,6 +571,7 @@ export default function App() {
       return;
     }
 
+    setIsLoggingIn(true);
     try {
       const result = await ApiClient.resetPassword(email, name, newPass);
       setCurrentUser(result.user);
@@ -577,6 +586,8 @@ export default function App() {
       alert('Your password has been reset successfully! You have been logged into your secure session.');
     } catch (err: any) {
       setAuthError(`Verification Failed: ${err.message || 'Password reset failed.'}`);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -942,10 +953,20 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50"
               >
-                <span>Activate Account & Sign In</span>
-                <ArrowRight className="w-4 h-4" />
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Activating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Activate Account & Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
               <button
@@ -1027,10 +1048,20 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50"
               >
-                <span>Reset Password & Log In</span>
-                <ArrowRight className="w-4 h-4" />
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Resetting Password...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Reset Password & Log In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
               <button
@@ -1098,10 +1129,20 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-sans font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50"
               >
-                <span>Sign In to Dashboard</span>
-                <ArrowRight className="w-4 h-4" />
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In to Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
 
             </form>
