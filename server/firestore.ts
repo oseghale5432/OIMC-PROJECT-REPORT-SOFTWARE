@@ -1,6 +1,23 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type CollectionReference, type DocumentData } from 'firebase-admin/firestore';
 import type { MonthProgress, PaymentRequest, StaffMember, YTDTask, AppNotification } from './types';
+import * as googleSheets from './googleSheets.js';
+
+async function runWithFallback<T>(firestoreOp: () => Promise<T>, sheetsOp: () => Promise<T>): Promise<T> {
+  try {
+    return await firestoreOp();
+  } catch (error: any) {
+    const isQuotaExceeded =
+      String(error?.message || '').includes('RESOURCE_EXHAUSTED') ||
+      String(error?.message || '').includes('Quota exceeded') ||
+      String(error?.message || '').includes('8');
+    if (isQuotaExceeded) {
+      console.warn('Firestore quota exceeded. Falling back to Google Sheets database...');
+      return await sheetsOp();
+    }
+    throw error;
+  }
+}
 
 function projectId() {
   const value = process.env.FIREBASE_PROJECT_ID?.trim();
@@ -91,50 +108,80 @@ export function getDatabaseId() {
 }
 
 export async function fetchWorkbook() {
-  const [ytdTasks, staff, progressReports] = await Promise.all([
-    readCollection<YTDTask>(collections.ytdTasks),
-    readCollection<StaffMember>(collections.staff),
-    readCollection<MonthProgress>(collections.progressReports),
-  ]);
-  return { ytdTasks, staff, progressReports };
+  return runWithFallback(
+    async () => {
+      const [ytdTasks, staff, progressReports] = await Promise.all([
+        readCollection<YTDTask>(collections.ytdTasks),
+        readCollection<StaffMember>(collections.staff),
+        readCollection<MonthProgress>(collections.progressReports),
+      ]);
+      return { ytdTasks, staff, progressReports };
+    },
+    () => googleSheets.fetchWorkbook()
+  );
 }
 
 export async function saveYTDTasks(tasks: YTDTask[]) {
-  await replaceCollection(db().collection(collections.ytdTasks), tasks, (task) => task.id);
+  await runWithFallback(
+    () => replaceCollection(db().collection(collections.ytdTasks), tasks, (task) => task.id),
+    () => googleSheets.saveYTDTasks(tasks)
+  );
 }
 
 export async function saveStaffProfiles(staff: StaffMember[]) {
-  await replaceCollection(
-    db().collection(collections.staff),
-    staff.map((member) => ({ ...member, email: member.email.trim().toLowerCase() })),
-    (member) => member.email
+  await runWithFallback(
+    () => replaceCollection(
+      db().collection(collections.staff),
+      staff.map((member) => ({ ...member, email: member.email.trim().toLowerCase() })),
+      (member) => member.email
+    ),
+    () => googleSheets.saveStaffProfiles(staff)
   );
 }
 
 export async function saveProgressReports(reports: MonthProgress[]) {
-  await replaceCollection(db().collection(collections.progressReports), reports, (report) => report.id);
+  await runWithFallback(
+    () => replaceCollection(db().collection(collections.progressReports), reports, (report) => report.id),
+    () => googleSheets.saveProgressReports(reports)
+  );
 }
 
 export async function fetchPayments(): Promise<PaymentRequest[]> {
-  return readCollection<PaymentRequest>(collections.payments);
+  return runWithFallback(
+    () => readCollection<PaymentRequest>(collections.payments),
+    () => googleSheets.fetchPayments()
+  );
 }
 
 export async function savePayments(payments: PaymentRequest[]) {
-  await replaceCollection(db().collection(collections.payments), payments, (payment) => payment.id);
+  await runWithFallback(
+    () => replaceCollection(db().collection(collections.payments), payments, (payment) => payment.id),
+    () => googleSheets.savePayments(payments)
+  );
 }
 
 export async function savePushToken(email: string, token: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  await db().collection(collections.pushTokens).doc(normalizedEmail).set({
-    email: normalizedEmail,
-    token: token.trim(),
-    updatedAt: new Date().toISOString(),
-  });
+  await runWithFallback(
+    async () => {
+      await db().collection(collections.pushTokens).doc(normalizedEmail).set({
+        email: normalizedEmail,
+        token: token.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    () => googleSheets.savePushToken(email, token)
+  );
 }
 
 export async function getPushTokens() {
-  const tokens = await readCollection<{ email: string; token: string }>(collections.pushTokens);
-  return tokens.filter((entry) => entry.email && entry.token);
+  return runWithFallback(
+    async () => {
+      const tokens = await readCollection<{ email: string; token: string }>(collections.pushTokens);
+      return tokens.filter((entry) => entry.email && entry.token);
+    },
+    () => googleSheets.getPushTokens()
+  );
 }
 
 export function sanitizeStaff(staff: StaffMember[]) {
@@ -142,33 +189,47 @@ export function sanitizeStaff(staff: StaffMember[]) {
 }
 
 export async function fetchNotifications(): Promise<AppNotification[]> {
-  return readCollection<AppNotification>(collections.notifications);
+  return runWithFallback(
+    () => readCollection<AppNotification>(collections.notifications),
+    () => googleSheets.fetchNotifications()
+  );
 }
 
 export async function addNotification(notification: AppNotification) {
-  await db().collection(collections.notifications).doc(notification.id).set(clean(notification));
+  await runWithFallback(
+    async () => { await db().collection(collections.notifications).doc(notification.id).set(clean(notification)); },
+    () => googleSheets.addNotification(notification)
+  );
 }
 
 export async function markNotificationAsRead(id: string) {
-  await db().collection(collections.notifications).doc(id).update({ isRead: true });
+  await runWithFallback(
+    async () => { await db().collection(collections.notifications).doc(id).update({ isRead: true }); },
+    () => googleSheets.markNotificationAsRead(id)
+  );
 }
 
 export async function markAllNotificationsAsRead(userEmail: string, isAdmin: boolean, isAccounts: boolean) {
-  const collection = db().collection(collections.notifications);
-  const snapshot = await collection.get();
-  const batch = db().batch();
-  snapshot.docs.forEach((doc) => {
-    const data = doc.data() as AppNotification;
-    const isRecipient =
-      !data.recipientEmail ||
-      data.recipientEmail === 'all' ||
-      (data.recipientEmail === 'admin' && isAdmin) ||
-      (data.recipientEmail === 'accounts' && isAccounts) ||
-      data.recipientEmail.toLowerCase() === userEmail.toLowerCase();
-    if (isRecipient && !data.isRead) {
-      batch.update(doc.ref, { isRead: true });
-    }
-  });
-  await batch.commit();
+  await runWithFallback(
+    async () => {
+      const collection = db().collection(collections.notifications);
+      const snapshot = await collection.get();
+      const batch = db().batch();
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data() as AppNotification;
+        const isRecipient =
+          !data.recipientEmail ||
+          data.recipientEmail === 'all' ||
+          (data.recipientEmail === 'admin' && isAdmin) ||
+          (data.recipientEmail === 'accounts' && isAccounts) ||
+          data.recipientEmail.toLowerCase() === userEmail.toLowerCase();
+        if (isRecipient && !data.isRead) {
+          batch.update(doc.ref, { isRead: true });
+        }
+      });
+      await batch.commit();
+    },
+    () => googleSheets.markAllNotificationsAsRead(userEmail, isAdmin, isAccounts)
+  );
 }
 

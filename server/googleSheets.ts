@@ -1,5 +1,5 @@
 import { requireEnv } from './http';
-import type { MonthProgress, PaymentRequest, StaffMember, TaskItem, YTDTask } from './types';
+import type { MonthProgress, PaymentRequest, StaffMember, TaskItem, YTDTask, AppNotification } from './types';
 
 const API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 let cachedToken: { value: string; expiresAt: number } | null = null;
@@ -345,3 +345,66 @@ function parseProgressReports(raw: string[][]): MonthProgress[] {
 export function sanitizeStaff(staff: StaffMember[]) {
   return staff.map(({ password, ...safeStaff }) => safeStaff);
 }
+
+export async function fetchNotifications(): Promise<AppNotification[]> {
+  await ensureSheet('Notifications');
+  const data = await sheetsFetch(`/values/${encodeURIComponent('Notifications!A1:G5000')}`);
+  return parseNotifications(data.values || []);
+}
+
+export async function saveNotifications(notifications: AppNotification[]) {
+  await ensureSheet('Notifications');
+  const headers = ['ID', 'Title', 'Body', 'Timestamp', 'Recipient Email', 'Type', 'Is Read'];
+  const rows = notifications.map((n) => [
+    n.id,
+    n.title,
+    n.body,
+    n.timestamp,
+    n.recipientEmail || '',
+    n.type,
+    n.isRead ? 'TRUE' : 'FALSE',
+  ]);
+  await updateRange('Notifications!A1:G', [headers, ...rows]);
+}
+
+function parseNotifications(raw: string[][]): AppNotification[] {
+  return raw.slice(1).filter((row) => row[0]).map((row) => ({
+    id: row[0],
+    title: row[1] || '',
+    body: row[2] || '',
+    timestamp: row[3] || '',
+    recipientEmail: row[4] || undefined,
+    type: (row[5] || 'system') as AppNotification['type'],
+    isRead: row[6] === 'TRUE',
+  }));
+}
+
+export async function addNotification(notification: AppNotification) {
+  const list = await fetchNotifications();
+  list.push(notification);
+  await saveNotifications(list);
+}
+
+export async function markNotificationAsRead(id: string) {
+  const list = await fetchNotifications();
+  const updated = list.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+  await saveNotifications(updated);
+}
+
+export async function markAllNotificationsAsRead(userEmail: string, isAdmin: boolean, isAccounts: boolean) {
+  const list = await fetchNotifications();
+  const updated = list.map((n) => {
+    const isRecipient =
+      !n.recipientEmail ||
+      n.recipientEmail === 'all' ||
+      (n.recipientEmail === 'admin' && isAdmin) ||
+      (n.recipientEmail === 'accounts' && isAccounts) ||
+      n.recipientEmail.toLowerCase() === userEmail.toLowerCase();
+    if (isRecipient && !n.isRead) {
+      return { ...n, isRead: true };
+    }
+    return n;
+  });
+  await saveNotifications(updated);
+}
+
