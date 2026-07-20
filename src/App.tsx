@@ -25,7 +25,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig, PaymentRequest, PaymentStatus } from './types';
+import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig, PaymentRequest, PaymentStatus, AppNotification } from './types';
 import { 
   DEFAULT_STAFF, 
   DEFAULT_YTD_TASKS, 
@@ -38,6 +38,7 @@ import YTDPage from './components/YTDPage';
 import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
 import PaymentPage from './components/PaymentPage';
+import NotificationsPage from './components/NotificationsPage';
 import { ApiClient, WorkbookPayload } from './apiClient';
 import { requestNotificationPermission, subscribeToPushNotifications, onForegroundMessage } from './firebaseMessaging';
 import { DEFAULT_ACCOUNTING_CODES } from './data/accountingCodes';
@@ -252,6 +253,10 @@ export default function App() {
   });
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentLagosMonth);
 
+  // Notifications States
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isSavingNotification, setIsSavingNotification] = useState(false);
+
   const handleSimulateEmailChange = (email: string) => {
     setSimulatedEmail(email);
     localStorage.setItem('oi_simulated_email', email);
@@ -369,24 +374,6 @@ export default function App() {
   }, [currentUser?.email, refreshServerWorkbook]);
 
   useEffect(() => {
-    if (!currentUser) return;
-
-    const refreshOnFocus = () => {
-      if (document.visibilityState === 'visible') {
-        refreshServerWorkbook({ silent: true }).catch(() => {});
-      }
-    };
-
-    window.addEventListener('focus', refreshOnFocus);
-    document.addEventListener('visibilitychange', refreshOnFocus);
-
-    return () => {
-      window.removeEventListener('focus', refreshOnFocus);
-      document.removeEventListener('visibilitychange', refreshOnFocus);
-    };
-  }, [currentUser, refreshServerWorkbook]);
-
-  useEffect(() => {
     if (!currentUser || currentTab !== 'ytd') return;
 
     refreshServerWorkbook({ silent: true }).catch(() => {});
@@ -413,6 +400,28 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshPayments]);
 
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const result = await ApiClient.loadNotifications();
+      setNotifications(result.notifications);
+    } catch {
+      // Fail silently
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    refreshNotifications().catch(() => {});
+    // Poll for notifications every 30 seconds for quick updates
+    const timer = window.setInterval(() => refreshNotifications().catch(() => {}), 30000);
+    return () => window.clearInterval(timer);
+  }, [currentUser, refreshNotifications]);
+
+  useEffect(() => {
+    if (!currentUser || currentTab !== 'notifications') return;
+    refreshNotifications().catch(() => {});
+  }, [currentUser, currentTab, refreshNotifications]);
+
   const handleSubmitPayment = async (
     payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>
   ) => {
@@ -423,6 +432,7 @@ export default function App() {
       setPayments(result.payments);
       setCanApprovePayments(result.canApprove);
       setCanCompletePayments(result.canComplete);
+      refreshNotifications().catch(() => {});
     } catch (err: any) {
       setPaymentError(err.message || 'Could not submit payment request.');
       throw err;
@@ -431,18 +441,31 @@ export default function App() {
     }
   };
 
-  const handlePaymentStatus = async (id: string, status: PaymentStatus) => {
+  const handlePaymentStatus = async (id: string, status: PaymentStatus, rejectionNotes?: string) => {
     setIsSavingPayment(true);
     setPaymentError(null);
     try {
-      const result = await ApiClient.updatePaymentStatus(id, status);
+      const result = await ApiClient.updatePaymentStatus(id, status, rejectionNotes);
       setPayments(result.payments);
       setCanApprovePayments(result.canApprove);
       setCanCompletePayments(result.canComplete);
+      refreshNotifications().catch(() => {});
     } catch (err: any) {
       setPaymentError(err.message || 'Could not update payment status.');
     } finally {
       setIsSavingPayment(false);
+    }
+  };
+
+  const handleMarkNotificationsRead = async (id?: string) => {
+    setIsSavingNotification(true);
+    try {
+      const result = await ApiClient.markNotificationRead(id);
+      setNotifications(result.notifications);
+    } catch (err: any) {
+      console.error('Failed to mark notifications read:', err);
+    } finally {
+      setIsSavingNotification(false);
     }
   };
 
@@ -820,6 +843,7 @@ export default function App() {
         'Please update your progress in the app as you complete your tasks.'
       );
       alert(`Reminder sent to ${result.delivered} staff.`);
+      refreshNotifications().catch(() => {});
     } catch (error: any) {
       alert(`Failed to send reminder: ${error.message || String(error)}`);
     }
@@ -1161,6 +1185,7 @@ export default function App() {
         spreadsheetUrl={sheetsConfig.spreadsheetUrl}
         isAdmin={isActualAdmin}
         onBroadcastReminder={handleBroadcastReminder}
+        unreadCount={notifications.filter((n) => !n.isRead).length}
       />
 
       {/* Main workspace container */}
@@ -1362,6 +1387,14 @@ export default function App() {
               error={paymentError}
               onSubmit={handleSubmitPayment}
               onUpdateStatus={handlePaymentStatus}
+            />
+          )}
+
+          {currentTab === 'notifications' && (
+            <NotificationsPage
+              notifications={notifications}
+              onMarkRead={handleMarkNotificationsRead}
+              isSaving={isSavingNotification}
             />
           )}
         </div>

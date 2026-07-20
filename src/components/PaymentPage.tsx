@@ -11,7 +11,7 @@ interface PaymentPageProps {
   accountingCodes: string[];
   error: string | null;
   onSubmit: (payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>) => Promise<void>;
-  onUpdateStatus: (id: string, status: PaymentStatus) => Promise<void>;
+  onUpdateStatus: (id: string, status: PaymentStatus, rejectionNotes?: string) => Promise<void>;
 }
 
 const statusStyles: Record<PaymentStatus, string> = {
@@ -32,6 +32,8 @@ export default function PaymentPage({
   onUpdateStatus,
 }: PaymentPageProps) {
   const [form, setForm] = useState({ code: '', payment: '', description: '', amount: '' });
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectionNotes, setRejectionNotes] = useState('');
   const canManage = canApprove || canComplete;
   const sortedPayments = useMemo(
     () => [...payments].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
@@ -138,16 +140,27 @@ export default function PaymentPage({
                     <td className="max-w-xs p-4 text-slate-600">{item.description}</td>
                     <td className="p-4 font-bold text-slate-900">₦{item.amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</td>
                     {canManage && <td className="p-4"><div className="font-medium text-slate-700">{item.requestedByName}</div><div className="text-xs text-slate-400">{item.requestedByEmail}</div></td>}
-                    <td className="p-4"><span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${statusStyles[item.status]}`}>{item.status === 'Payment Made' ? <CheckCircle2 className="h-3.5 w-3.5" /> : item.status === 'Rejected' ? <XCircle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}{item.status}</span></td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${statusStyles[item.status]}`}>
+                        {item.status === 'Payment Made' ? <CheckCircle2 className="h-3.5 w-3.5" /> : item.status === 'Rejected' ? <XCircle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
+                        {item.status}
+                      </span>
+                      {item.status === 'Rejected' && item.rejectionNotes && (
+                        <div className="mt-1.5 max-w-[220px] text-xs font-semibold text-rose-600 bg-rose-50/50 border border-rose-100 rounded-lg p-2 leading-normal">
+                          <span className="font-extrabold uppercase text-[9px] tracking-wider block text-rose-500 mb-0.5">Reason for rejection:</span>
+                          {item.rejectionNotes}
+                        </div>
+                      )}
+                    </td>
                     <td className="p-4 text-xs text-slate-500">{new Date(item.submittedAt).toLocaleString()}</td>
                     {canManage && (
                       <td className="p-4">
                         {canApprove && item.status === 'Pending Approval' ? (
                           <div className="flex gap-2">
                             <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Approved for Processing')}
-                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">Approve</button>
-                            <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Rejected')}
-                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50">Reject</button>
+                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer">Approve</button>
+                            <button disabled={isSaving} onClick={() => { setRejectingId(item.id); setRejectionNotes(''); }}
+                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">Reject</button>
                           </div>
                         ) : canComplete && item.status === 'Approved for Processing' ? (
                           <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Payment Made')}
@@ -170,6 +183,47 @@ export default function PaymentPage({
           </div>
         )}
       </div>
+      {/* Rejection Notes Modal */}
+      {rejectingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-base font-extrabold text-slate-900">Provide Rejection Reason</h3>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Please enter the reason for rejecting this payment request. The requester will be notified of your notes.
+            </p>
+            <textarea
+              required
+              rows={3}
+              value={rejectionNotes}
+              onChange={(e) => setRejectionNotes(e.target.value)}
+              placeholder="e.g. Invalid receipt, wrong accounting code, or budget exceeded..."
+              className="mt-4 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none transition-all focus:border-orange-500 focus:ring-1 focus:ring-orange-500 placeholder-slate-400"
+            />
+            <div className="mt-5 flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setRejectingId(null)}
+                className="rounded-xl border border-slate-250 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 focus:outline-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={async () => {
+                  if (!rejectingId) return;
+                  await onUpdateStatus(rejectingId, 'Rejected', rejectionNotes);
+                  setRejectingId(null);
+                  setRejectionNotes('');
+                }}
+                className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-600/10 hover:bg-rose-700 focus:outline-none disabled:opacity-50 cursor-pointer"
+              >
+                {isSaving ? 'Rejecting...' : 'Reject Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

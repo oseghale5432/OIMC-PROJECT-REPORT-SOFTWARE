@@ -16,7 +16,8 @@ import {
   CheckCircle,
   HelpCircle,
   Menu,
-  X
+  X,
+  Bell
 } from 'lucide-react';
 import { Banknote } from 'lucide-react';
 import { StaffMember } from '../types';
@@ -36,6 +37,7 @@ interface HeaderProps {
   spreadsheetUrl: string | null;
   isAdmin: boolean;
   onBroadcastReminder: () => void;
+  unreadCount: number;
 }
 
 export default function Header({
@@ -53,6 +55,7 @@ export default function Header({
   spreadsheetUrl,
   isAdmin,
   onBroadcastReminder,
+  unreadCount,
 }: HeaderProps) {
   const [showSimMenu, setShowSimMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -134,6 +137,24 @@ export default function Header({
             </button>
 
             <button
+              id="tab-notifications"
+              onClick={() => handleTabClick('notifications')}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 relative ${
+                currentTab === 'notifications'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              <span>NOTIFICATIONS</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white border border-slate-850 shadow-sm animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            <button
               id="tab-personal"
               onClick={() => handleTabClick('personal')}
               className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
@@ -159,34 +180,21 @@ export default function Header({
               {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            {/* Firestore Status */}
-            {currentUser?.role === 'admin' && (
+            {/* Load Server Sheet (if not linked) */}
+            {currentUser?.role === 'admin' && !isSheetsLinked && (
               <div className="hidden lg:flex items-center space-x-2">
-                {isSheetsLinked ? (
-                  <a
-                    href={spreadsheetUrl || '#'}
-                    target="_blank"
-                    referrerPolicy="no-referrer"
-                    className="flex items-center space-x-1.5 bg-emerald-950/40 text-emerald-400 border border-emerald-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-emerald-900/40 transition-colors"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <button
+                  onClick={onLinkSheets}
+                  disabled={isLinkingSheets}
+                  className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isLinkingSheets ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
                     <Database className="w-3.5 h-3.5" />
-                    <span>Firestore Database Active</span>
-                  </a>
-                ) : (
-                  <button
-                    onClick={onLinkSheets}
-                    disabled={isLinkingSheets}
-                    className="flex items-center space-x-1.5 bg-orange-950/40 text-orange-400 border border-orange-800/60 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-orange-900/40 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {isLinkingSheets ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Database className="w-3.5 h-3.5" />
-                    )}
-                    <span>Load Server Sheet</span>
-                  </button>
-                )}
+                  )}
+                  <span>Load Server Sheet</span>
+                </button>
               </div>
             )}
 
@@ -312,6 +320,27 @@ export default function Header({
 
               <button
                 type="button"
+                onClick={() => handleTabClick('notifications')}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
+                  currentTab === 'notifications'
+                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                <span className="flex items-center space-x-2 relative">
+                  <Bell className="w-4 h-4" />
+                  <span>Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="ml-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                </span>
+                {currentTab === 'notifications' && <CheckCircle className="w-4 h-4" />}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleTabClick('ytd')}
                 className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
                   currentTab === 'ytd'
@@ -361,39 +390,24 @@ export default function Header({
               </button>
             </nav>
 
-            {currentUser?.role === 'admin' && (
+            {currentUser?.role === 'admin' && !isSheetsLinked && (
               <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-                {isSheetsLinked ? (
-                  <a
-                    href={spreadsheetUrl || '#'}
-                    target="_blank"
-                    referrerPolicy="no-referrer"
-                    className="flex items-center justify-between text-emerald-400 text-xs font-semibold"
-                  >
-                    <span className="flex items-center space-x-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      <Database className="w-4 h-4" />
-                      <span>Firestore Database Active</span>
-                    </span>
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onLinkSheets();
-                      setShowMobileMenu(false);
-                    }}
-                    disabled={isLinkingSheets}
-                    className="w-full flex items-center justify-center space-x-2 text-orange-400 text-xs font-semibold disabled:opacity-50"
-                  >
-                    {isLinkingSheets ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Database className="w-4 h-4" />
-                    )}
-                    <span>Load Server Sheet</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onLinkSheets();
+                    setShowMobileMenu(false);
+                  }}
+                  disabled={isLinkingSheets}
+                  className="w-full flex items-center justify-center space-x-2 text-orange-400 text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  {isLinkingSheets ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Database className="w-4 h-4" />
+                  )}
+                  <span>Load Server Sheet</span>
+                </button>
               </div>
             )}
           </div>

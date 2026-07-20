@@ -1,6 +1,6 @@
-import { readJson, sendJson, type ApiRequest, type ApiResponse } from './_server_helpers.js';
-import { getSessionUser, isAdmin } from './_server_helpers.js';
-import { getPushTokens, savePushToken } from '../server/firestore.js';
+import * as crypto from 'crypto';
+import { readJson, sendJson, type ApiRequest, type ApiResponse, getSessionUser, isAdmin } from './_server_helpers.js';
+import { getPushTokens, savePushToken, fetchNotifications, addNotification, markNotificationAsRead, markAllNotificationsAsRead, fetchWorkbook } from '../server/firestore.js';
 import { sendFcmMessage } from './_server_helpers.js';
 
 function actionName(req: ApiRequest) {
@@ -19,7 +19,75 @@ function actionName(req: ApiRequest) {
 }
 
 async function innerHandler(req: ApiRequest, res: ApiResponse) {
-  const action = actionName(req).toLowerCase();
+  const method = req.method;
+  let action = actionName(req).toLowerCase();
+
+  if (method === 'GET' && !action) {
+    action = 'list';
+  }
+
+  if (action === 'list') {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });
+    const user = getSessionUser(req);
+    if (!user) return sendJson(res, 401, { error: 'Your session expired. Please sign in again.' });
+
+    try {
+      const notifications = await fetchNotifications();
+      const userIsAdmin = isAdmin(user);
+
+      // Check if user is in Accounts/Finance department
+      const { staff } = await fetchWorkbook();
+      const profile = staff.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+      const userIsAccounts = String(profile?.department || '').toUpperCase().includes('ACCOUNT') || String(profile?.department || '').toUpperCase().includes('FINANCE');
+
+      const visible = notifications.filter((n) => {
+        if (n.recipientEmail === 'admin') return userIsAdmin;
+        if (n.recipientEmail === 'accounts') return userIsAccounts;
+        if (!n.recipientEmail || n.recipientEmail === 'all') return true;
+        return n.recipientEmail.toLowerCase() === user.email.toLowerCase();
+      });
+
+      visible.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      return sendJson(res, 200, { notifications: visible });
+    } catch (err: any) {
+      return sendJson(res, 500, { error: err.message || 'Failed to fetch notifications.' });
+    }
+  }
+
+  if (action === 'read') {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+    const user = getSessionUser(req);
+    if (!user) return sendJson(res, 401, { error: 'Your session expired. Please sign in again.' });
+
+    try {
+      const body = await readJson(req);
+      const id = body.id;
+
+      const { staff } = await fetchWorkbook();
+      const profile = staff.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
+      const userIsAccounts = String(profile?.department || '').toUpperCase().includes('ACCOUNT') || String(profile?.department || '').toUpperCase().includes('FINANCE');
+      const userIsAdmin = isAdmin(user);
+
+      if (id) {
+        await markNotificationAsRead(id);
+      } else {
+        await markAllNotificationsAsRead(user.email, userIsAdmin, userIsAccounts);
+      }
+
+      const notifications = await fetchNotifications();
+      const visible = notifications.filter((n) => {
+        if (n.recipientEmail === 'admin') return userIsAdmin;
+        if (n.recipientEmail === 'accounts') return userIsAccounts;
+        if (!n.recipientEmail || n.recipientEmail === 'all') return true;
+        return n.recipientEmail.toLowerCase() === user.email.toLowerCase();
+      });
+
+      visible.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      return sendJson(res, 200, { notifications: visible });
+    } catch (err: any) {
+      return sendJson(res, 500, { error: err.message || 'Failed to update notifications.' });
+    }
+  }
 
   if (action === 'register') {
     if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
@@ -63,6 +131,17 @@ async function innerHandler(req: ApiRequest, res: ApiResponse) {
           }
         })
       );
+
+      // Store in firestore notifications database
+      await addNotification({
+        id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+        title,
+        body: message,
+        timestamp: new Date().toISOString(),
+        recipientEmail: 'all',
+        type: 'broadcast',
+        isRead: false,
+      });
 
       return sendJson(res, 200, { delivered: results.filter((r) => r.status === 'sent').length, results });
     } catch (error: any) {

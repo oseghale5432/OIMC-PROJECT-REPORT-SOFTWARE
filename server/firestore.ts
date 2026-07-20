@@ -1,6 +1,6 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type CollectionReference, type DocumentData } from 'firebase-admin/firestore';
-import type { MonthProgress, PaymentRequest, StaffMember, YTDTask } from './types';
+import type { MonthProgress, PaymentRequest, StaffMember, YTDTask, AppNotification } from './types';
 
 function projectId() {
   const value = process.env.FIREBASE_PROJECT_ID?.trim();
@@ -36,6 +36,7 @@ const collections = {
   progressReports: 'progressReports',
   payments: 'payments',
   pushTokens: 'pushTokens',
+  notifications: 'notifications',
 } as const;
 
 function clean<T>(value: T): T {
@@ -139,3 +140,35 @@ export async function getPushTokens() {
 export function sanitizeStaff(staff: StaffMember[]) {
   return staff.map(({ password, ...safeStaff }) => safeStaff);
 }
+
+export async function fetchNotifications(): Promise<AppNotification[]> {
+  return readCollection<AppNotification>(collections.notifications);
+}
+
+export async function addNotification(notification: AppNotification) {
+  await db().collection(collections.notifications).doc(notification.id).set(clean(notification));
+}
+
+export async function markNotificationAsRead(id: string) {
+  await db().collection(collections.notifications).doc(id).update({ isRead: true });
+}
+
+export async function markAllNotificationsAsRead(userEmail: string, isAdmin: boolean, isAccounts: boolean) {
+  const collection = db().collection(collections.notifications);
+  const snapshot = await collection.get();
+  const batch = db().batch();
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data() as AppNotification;
+    const isRecipient =
+      !data.recipientEmail ||
+      data.recipientEmail === 'all' ||
+      (data.recipientEmail === 'admin' && isAdmin) ||
+      (data.recipientEmail === 'accounts' && isAccounts) ||
+      data.recipientEmail.toLowerCase() === userEmail.toLowerCase();
+    if (isRecipient && !data.isRead) {
+      batch.update(doc.ref, { isRead: true });
+    }
+  });
+  await batch.commit();
+}
+

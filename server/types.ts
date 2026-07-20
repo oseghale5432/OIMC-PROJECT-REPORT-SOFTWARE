@@ -63,4 +63,16 @@ export interface PaymentRequest {
   submittedAt: string;
   updatedAt: string;
   updatedBy: string;
+  rejectionNotes?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  timestamp: string;
+  recipientEmail?: string; // "all", "admin", "accounts", or specific user email
+  type: 'payment' | 'broadcast' | 'system';
+  isRead: boolean;
+}
+

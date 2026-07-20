@@ -1,4 +1,4 @@
-import { MonthProgress, PaymentRequest, PaymentStatus, StaffMember, YTDTask } from './types';
+import { MonthProgress, PaymentRequest, PaymentStatus, StaffMember, YTDTask, AppNotification } from './types';
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = {
@@ -116,10 +116,10 @@ export const ApiClient = {
     });
   },
 
-  updatePaymentStatus(id: string, status: PaymentStatus) {
+  updatePaymentStatus(id: string, status: PaymentStatus, rejectionNotes?: string) {
     return apiFetch<{ payments: PaymentRequest[]; canApprove: boolean; canComplete: boolean }>('/api/payments', {
       method: 'POST',
-      body: JSON.stringify({ action: 'updateStatus', id, status }),
+      body: JSON.stringify({ action: 'updateStatus', id, status, rejectionNotes }),
     });
   },
 
@@ -136,6 +136,18 @@ export const ApiClient = {
       method: 'POST',
       body: JSON.stringify({ title, body }),
       headers: { 'X-Action': 'broadcast' },
+    });
+  },
+
+  loadNotifications() {
+    return apiFetch<{ notifications: AppNotification[] }>('/api/notifications');
+  },
+
+  markNotificationRead(id?: string) {
+    return apiFetch<{ notifications: AppNotification[] }>('/api/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+      headers: { 'X-Action': 'read' },
     });
   },
 };
