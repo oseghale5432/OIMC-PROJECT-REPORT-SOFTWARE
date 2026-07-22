@@ -7,7 +7,7 @@ import {
   sanitizeStaff,
   saveProgressReports,
   saveYTDTasks,
-} from '../server/firestore.js';
+} from '../server/supabase.js';
 import type { MonthProgress, YTDTask } from '../server/types.js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {

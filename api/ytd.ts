@@ -1,5 +1,5 @@
 import { readJson, sendJson, getSessionUser, isAdmin, type ApiRequest, type ApiResponse } from './_server_helpers.js';
-import { fetchWorkbook, saveYTDTasks, sanitizeStaff } from '../server/firestore.js';
+import { fetchWorkbook, saveYTDTasks, sanitizeStaff } from '../server/supabase.js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });

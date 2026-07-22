@@ -1,5 +1,6 @@
 import { sendJson, getSessionUser, type ApiRequest, type ApiResponse } from './_server_helpers.js';
-import { fetchWorkbook, getDatabaseId, sanitizeStaff } from '../server/firestore.js';
+import { fetchWorkbook, getDatabaseId, sanitizeStaff } from '../server/supabase.js';
+
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed' });

@@ -12,7 +12,7 @@ import {
   savePushToken,
   saveStaffProfiles,
   saveYTDTasks,
-} from '../server/firestore.js';
+} from '../server/supabase.js';
 
 config({ path: '.env.local' });
 config();
@@ -23,9 +23,8 @@ function validateEnvironment() {
     'GOOGLE_SHEETS_SPREADSHEET_ID',
     'GOOGLE_SERVICE_ACCOUNT_EMAIL',
     'GOOGLE_PRIVATE_KEY',
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_CLIENT_EMAIL',
-    'FIREBASE_PRIVATE_KEY',
+    'SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
   ];
   const missing = required.filter((name) => !process.env[name]?.trim());
 
@@ -40,7 +39,7 @@ function validateEnvironment() {
 
 async function migrate() {
   validateEnvironment();
-  console.log(`Migrating Google Sheets data to Firestore project ${getDatabaseId()}...`);
+  console.log(`Migrating Google Sheets data to Supabase database instance: ${getDatabaseId()}...`);
   const [workbook, payments, pushTokens] = await Promise.all([
     fetchWorkbook(),
     fetchPayments(),

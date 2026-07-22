@@ -1,7 +1,6 @@
 import { config } from 'dotenv';
 import { setDefaultResultOrder } from 'node:dns';
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { createClient } from '@supabase/supabase-js';
 import * as googleSheets from '../server/googleSheets.js';
 import type { MonthProgress, PaymentRequest, StaffMember, YTDTask, AppNotification } from '../server/types.js';
 
@@ -9,38 +8,37 @@ config({ path: '.env.local' });
 config();
 setDefaultResultOrder('ipv4first');
 
-// Initialize Firebase Admin
-const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+// Initialize Supabase Client
+const sbUrl = process.env.SUPABASE_URL?.trim();
+const sbServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-if (!projectId || !clientEmail || !privateKey) {
-  throw new Error('Missing Firebase service account credentials in .env.local.');
+if (!sbUrl || !sbServiceKey) {
+  throw new Error('Missing Supabase environment credentials in .env.local.');
 }
 
-const app = getApps().length
-  ? getApps()[0]
-  : initializeApp({
-      credential: cert({ projectId, clientEmail, privateKey }),
-      projectId,
-    });
+const supabase = createClient(sbUrl, sbServiceKey, {
+  auth: { persistSession: false }
+});
 
-const db = getFirestore(app);
-
-async function readCollection<T>(name: string): Promise<T[]> {
-  const snapshot = await db.collection(name).get();
-  return snapshot.docs.map((doc) => doc.data() as T);
+async function readCollection<T>(tableName: string): Promise<T[]> {
+  const { data, error } = await supabase
+    .from(tableName)
+    .select('data');
+  if (error) {
+    throw error;
+  }
+  return (data || []).map((row: any) => row.data as T);
 }
 
 async function sync() {
-  console.log(`Reading data from Firestore project: ${projectId}...`);
+  console.log(`Reading data from Supabase database project: ${sbUrl}...`);
   const [ytdTasks, staff, progressReports, payments, notifications, pushTokens] = await Promise.all([
-    readCollection<YTDTask>('ytdTasks'),
+    readCollection<YTDTask>('ytd_tasks'),
     readCollection<StaffMember>('staff'),
-    readCollection<MonthProgress>('progressReports'),
+    readCollection<MonthProgress>('progress_reports'),
     readCollection<PaymentRequest>('payments'),
     readCollection<AppNotification>('notifications'),
-    readCollection<{ email: string; token: string }>('pushTokens'),
+    readCollection<{ email: string; token: string }>('push_tokens'),
   ]);
 
   console.log(`Writing data to Google Sheets spreadsheet ID: ${googleSheets.getSpreadsheetId()}...`);

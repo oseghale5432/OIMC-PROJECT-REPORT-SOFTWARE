@@ -1,6 +1,6 @@
 import { readJson, sendJson, sessionCookie, clearSessionCookie, type ApiRequest, type ApiResponse } from './_server_helpers.js';
 import { createSession, verifyPassword, isHashedPassword, hashPassword, getSessionUser } from './_server_helpers.js';
-import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from '../server/firestore.js';
+import { fetchWorkbook, saveStaffProfiles, sanitizeStaff } from '../server/supabase.js';
 
 function actionName(req: ApiRequest) {
   const url = (req as any).url || '';

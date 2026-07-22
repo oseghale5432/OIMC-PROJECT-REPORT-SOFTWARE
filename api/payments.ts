@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { getSessionUser, readJson, sendJson, type ApiRequest, type ApiResponse } from './_server_helpers.js';
-import { fetchPayments, fetchWorkbook, savePayments, addNotification } from '../server/firestore.js';
+import { fetchPayments, fetchWorkbook, savePayments, addNotification } from '../server/supabase.js';
 import type { PaymentStatus } from '../server/types.js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {

@@ -9,11 +9,13 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "migrate:firestore": "tsx scripts/migrate-google-sheets-to-firestore.ts",
-    "sync:sheets": "tsx scripts/sync-firestore-to-google-sheets.ts"
+    "migrate:supabase": "tsx scripts/migrate-google-sheets-to-supabase.ts",
+    "migrate:firestore-to-supabase": "tsx scripts/migrate-firestore-to-supabase.ts",
+    "sync:sheets": "tsx scripts/sync-supabase-to-google-sheets.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",

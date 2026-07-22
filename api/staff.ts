@@ -14,7 +14,7 @@ import {
   sanitizeStaff,
   saveProgressReports,
   saveStaffProfiles,
-} from '../server/firestore.js';
+} from '../server/supabase.js';
 import type { StaffMember } from '../server/types.js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {

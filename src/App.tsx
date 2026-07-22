@@ -292,7 +292,7 @@ export default function App() {
     setProgressReports(workbook.progressReports || []);
     setSheetsConfig((prev) => ({
       ...prev,
-      spreadsheetId: workbook.databaseId || prev.spreadsheetId || 'firestore',
+      spreadsheetId: workbook.databaseId || prev.spreadsheetId || 'supabase',
       spreadsheetUrl: null,
       isSynced: true,
       lastSyncedAt: new Date().toLocaleTimeString(),
@@ -609,21 +609,21 @@ export default function App() {
     });
   };
 
-  // Load the server-managed Firestore database configured in Vercel.
+  // Load the server-managed Supabase database configured in Vercel.
   const handleLinkSheets = async () => {
     setIsLinkingSheets(true);
     try {
       await refreshServerWorkbook();
-      alert('Firestore database loaded. Admins and employees are now using the same live database.');
+      alert('Supabase database loaded. Admins and employees are now using the same live database.');
     } catch (err: any) {
-      console.error('Failed to load Firestore:', err);
-      alert(`Could not load Firestore. Check the Firebase service-account environment variables. Details: ${err.message || err}`);
+      console.error('Failed to load Supabase:', err);
+      alert(`Could not load Supabase. Check the Supabase environment variables. Details: ${err.message || err}`);
     } finally {
       setIsLinkingSheets(false);
     }
   };
 
-  // Push updates to Firestore.
+  // Push updates to Supabase.
   const syncUpdatesToGoogleSheet = async (
     updatedTasks?: YTDTask[],
     updatedReports?: MonthProgress[]
@@ -645,7 +645,7 @@ export default function App() {
       }));
     } catch (err: any) {
       console.error('Error syncing updates to sheet:', err);
-      alert(`Could not sync changes to Firestore: ${err.message || err}`);
+      alert(`Could not sync changes to Supabase: ${err.message || err}`);
     } finally {
       setIsSyncing(false);
     }
@@ -710,7 +710,7 @@ export default function App() {
       setTasks(updatedYTDTasks);
     }
 
-    // Logged-in users save through Firestore.
+    // Logged-in users save through Supabase.
     if (currentUser) {
       setIsSyncing(true);
       try {
@@ -718,7 +718,7 @@ export default function App() {
         applyServerWorkbook(workbook);
       } catch (err: any) {
         console.error('Error saving progress through server:', err);
-        alert(`Could not save progress to Firestore: ${err.message || err}`);
+        alert(`Could not save progress to Supabase: ${err.message || err}`);
       } finally {
         setIsSyncing(false);
       }
@@ -748,13 +748,13 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Logged-in admins save staff through Firestore.
+    // Logged-in admins save staff through Supabase.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not save staff profile to Firestore: ${err.message || err}`);
+        alert(`Could not save staff profile to Supabase: ${err.message || err}`);
       }
     }
   };
@@ -764,13 +764,13 @@ export default function App() {
     const updatedStaffList = staffList.map(s => s.email === updatedStaff.email ? updatedStaff : s);
     setStaffList(updatedStaffList);
 
-    // Logged-in admins save staff through Firestore.
+    // Logged-in admins save staff through Supabase.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not update staff profile in Firestore: ${err.message || err}`);
+        alert(`Could not update staff profile in Supabase: ${err.message || err}`);
       }
     }
   };
@@ -783,13 +783,13 @@ export default function App() {
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
 
-    // Logged-in admins save staff through Firestore.
+    // Logged-in admins save staff through Supabase.
     if (currentUser) {
       try {
         const workbook = await ApiClient.saveStaff(updatedStaffList, updatedReports);
         applyServerWorkbook(workbook);
       } catch (err: any) {
-        alert(`Could not delete staff profile from Firestore: ${err.message || err}`);
+        alert(`Could not delete staff profile from Supabase: ${err.message || err}`);
       }
     }
   };
@@ -1333,10 +1333,10 @@ export default function App() {
             <div className="space-y-1">
               <h3 className="font-sans font-extrabold text-base flex items-center space-x-2">
                 <Database className="w-5 h-5 animate-bounce" />
-                <span>Firestore Database Not Loaded</span>
+                <span>Supabase Database Not Loaded</span>
               </h3>
               <p className="text-sm text-orange-50">
-                Load the shared Firestore project configured in Vercel. Admins and employees use this same database.
+                Load the shared Supabase project configured in Vercel. Admins and employees use this same database.
               </p>
             </div>
             <button
@@ -1358,7 +1358,7 @@ export default function App() {
         {isSyncing && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white border border-slate-700 px-4 py-2 rounded-full text-xs font-semibold shadow-2xl flex items-center space-x-2 z-50">
             <RefreshCw className="w-3.5 h-3.5 animate-spin text-orange-400" />
-            <span>Syncing database with Firestore...</span>
+            <span>Syncing database with Supabase...</span>
           </div>
         )}
 
@@ -1441,7 +1441,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>&copy; 2026 Orange Island Resorts. All Rights Reserved.</span>
           <div className="flex space-x-4">
-            <span className="text-slate-400 font-mono">Status: {sheetsConfig.spreadsheetId ? 'Online (Firestore DB)' : 'Local Offline Mode'}</span>
+            <span className="text-slate-400 font-mono">Status: {sheetsConfig.spreadsheetId ? 'Online (Supabase DB)' : 'Local Offline Mode'}</span>
             {sheetsConfig.lastSyncedAt && (
               <span className="text-slate-400 font-mono">Last Sync: {sheetsConfig.lastSyncedAt}</span>
             )}

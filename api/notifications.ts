@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { readJson, sendJson, type ApiRequest, type ApiResponse, getSessionUser, isAdmin } from './_server_helpers.js';
-import { getPushTokens, savePushToken, fetchNotifications, addNotification, markNotificationAsRead, markAllNotificationsAsRead, fetchWorkbook } from '../server/firestore.js';
+import { getPushTokens, savePushToken, fetchNotifications, addNotification, markNotificationAsRead, markAllNotificationsAsRead, fetchWorkbook } from '../server/supabase.js';
 import { sendFcmMessage } from './_server_helpers.js';
 
 function actionName(req: ApiRequest) {
