@@ -29,15 +29,30 @@ self.addEventListener('push', (event) => {
       vibrate: [100, 50, 100],
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    const badgePromise = ('setAppBadge' in navigator)
+      ? navigator.setAppBadge(1).catch((err) => console.error('Failed to set app badge in background:', err))
+      : Promise.resolve();
+
+    event.waitUntil(
+      Promise.all([
+        self.registration.showNotification(title, options),
+        badgePromise
+      ])
+    );
   } catch (error) {
     console.error('Error parsing push event data:', error);
+    const badgePromise = ('setAppBadge' in navigator)
+      ? navigator.setAppBadge(1).catch(() => undefined)
+      : Promise.resolve();
     // Fallback if the payload is text or fails to parse as JSON
     event.waitUntil(
-      self.registration.showNotification('Orange Island Progress Tracker', {
-        body: event.data.text() || 'Please check the tracker for updates.',
-        icon: '/assets/orange-island-logo.png',
-      })
+      Promise.all([
+        self.registration.showNotification('Orange Island Progress Tracker', {
+          body: event.data.text() || 'Please check the tracker for updates.',
+          icon: '/assets/orange-island-logo.png',
+        }),
+        badgePromise
+      ])
     );
   }
 });

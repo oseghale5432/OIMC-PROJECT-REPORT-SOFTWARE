@@ -842,6 +842,22 @@ export default function App() {
     return () => unsubscribe();
   }, [currentUser]);
 
+  // Synchronize homescreen app badge with unread notifications count
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
+      const unreadCount = notifications.filter((n) => !n.isRead).length;
+      if (unreadCount > 0) {
+        navigator.setAppBadge(unreadCount).catch((err) => {
+          console.warn('Failed to update app badge:', err);
+        });
+      } else {
+        navigator.clearAppBadge().catch((err) => {
+          console.warn('Failed to clear app badge:', err);
+        });
+      }
+    }
+  }, [notifications]);
+
   const handleBroadcastReminder = async () => {
     try {
       const result = await ApiClient.broadcastNotification(
