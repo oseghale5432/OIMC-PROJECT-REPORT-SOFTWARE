@@ -662,7 +662,7 @@ export default function App() {
     const task: YTDTask = {
       ...newTask,
       id: `ytd_${Math.random().toString(36).substr(2, 9)}`,
-      daysRemaining: diffDays > 0 ? diffDays : 0,
+      daysRemaining: diffDays,
     };
 
     const updatedTasks = [...tasks, task];

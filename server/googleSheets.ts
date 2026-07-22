@@ -210,7 +210,7 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
     'Remark',
   ];
 
-  const rows = tasks.map((t) => [
+  const rows = tasks.map((t, idx) => [
     t.id,
     t.department,
     t.lead,
@@ -219,7 +219,7 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
     t.description,
     t.startDate,
     t.dueDate,
-    String(t.daysRemaining),
+    `=IF(H${idx + 2}="", "", H${idx + 2}-TODAY())`,
     t.status,
     t.remark,
   ]);
@@ -282,20 +282,37 @@ export async function saveProgressReports(reports: MonthProgress[]) {
   await updateRange('Progress_Reports!A1:AH', [headers, ...rows]);
 }
 
+export function calculateDaysRemaining(dueDateStr: string): number {
+  if (!dueDateStr) return 0;
+  const due = new Date(dueDateStr);
+  if (isNaN(due.getTime())) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dueZero = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+  const diffTime = dueZero.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
 function parseYTDTasks(raw: string[][]): YTDTask[] {
-  return raw.slice(1).filter((row) => row[0]).map((row) => ({
-    id: row[0],
-    department: row[1] || '',
-    lead: row[2] || '',
-    coWorker: row[3] || '',
-    contractorHead: row[4] || '',
-    description: row[5] || '',
-    startDate: row[6] || '',
-    dueDate: row[7] || '',
-    daysRemaining: parseInt(row[8] || '0', 10),
-    status: row[9] || '',
-    remark: row[10] || '',
-  }));
+  return raw.slice(1).filter((row) => row[0]).map((row) => {
+    const dueDate = row[7] || '';
+    return {
+      id: row[0],
+      department: row[1] || '',
+      lead: row[2] || '',
+      coWorker: row[3] || '',
+      contractorHead: row[4] || '',
+      description: row[5] || '',
+      startDate: row[6] || '',
+      dueDate,
+      daysRemaining: calculateDaysRemaining(dueDate),
+      status: row[9] || '',
+      remark: row[10] || '',
+    };
+  });
 }
 
 function parseStaff(raw: string[][]): StaffMember[] {

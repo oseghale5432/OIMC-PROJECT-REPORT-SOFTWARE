@@ -130,7 +130,7 @@ export default function YTDPage({
 
       onUpdateTask({
         ...editingTask,
-        daysRemaining: diffDays > 0 ? diffDays : 0,
+        daysRemaining: diffDays,
       });
       setEditingId(null);
       setEditingTask(null);

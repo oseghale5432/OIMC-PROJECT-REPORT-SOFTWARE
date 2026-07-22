@@ -125,16 +125,24 @@ export async function fetchWorkbook() {
         readCollection<StaffMember>('staff'),
         readCollection<MonthProgress>('progress_reports'),
       ]);
-      return { ytdTasks, staff, progressReports };
+      const recalculatedTasks = ytdTasks.map((task) => ({
+        ...task,
+        daysRemaining: googleSheets.calculateDaysRemaining(task.dueDate),
+      }));
+      return { ytdTasks: recalculatedTasks, staff, progressReports };
     },
     () => googleSheets.fetchWorkbook()
   );
 }
 
 export async function saveYTDTasks(tasks: YTDTask[]) {
+  const recalculatedTasks = tasks.map((task) => ({
+    ...task,
+    daysRemaining: googleSheets.calculateDaysRemaining(task.dueDate),
+  }));
   await runWithBackup(
-    () => replaceCollection('ytd_tasks', tasks, (task) => task.id),
-    () => googleSheets.saveYTDTasks(tasks)
+    () => replaceCollection('ytd_tasks', recalculatedTasks, (task) => task.id),
+    () => googleSheets.saveYTDTasks(recalculatedTasks)
   );
 }
 
