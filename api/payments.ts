@@ -14,10 +14,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const { staff } = await fetchWorkbook();
     const profile = staff.find((item) => item.email.toLowerCase() === user.email.toLowerCase());
-    const canApprove = user.role === 'admin' || user.email.toLowerCase() === 'oseghale5432@gmail.com';
+    const userEmailLower = user.email.toLowerCase();
+
+    // Determine roles & permissions
+    const isSuperAdmin = userEmailLower === 'oseghale5432@gmail.com';
+    
+    // OIMC GM: email vaughaned1965@gmail.com, or "OIMC GM" in department/activity
+    const isGM = userEmailLower === 'vaughaned1965@gmail.com' ||
+                 String(profile?.department || '').toUpperCase().includes('OIMC GM') ||
+                 String(profile?.activity || '').toUpperCase().includes('OIMC GM');
+                 
+    // OIDC COO: email juyinad@gmail.com, or "OIDC COO" in department/activity
+    const isCOO = userEmailLower === 'juyinad@gmail.com' ||
+                  String(profile?.department || '').toUpperCase().includes('OIDC COO') ||
+                  String(profile?.activity || '').toUpperCase().includes('OIDC COO');
+
     const paymentDepartment = String(profile?.department || '').toUpperCase();
-    const canComplete = paymentDepartment.includes('ACCOUNT') || paymentDepartment.includes('FINANCE');
-    const canViewAll = canApprove || canComplete;
+    const isAccounts = paymentDepartment.includes('ACCOUNT') || paymentDepartment.includes('FINANCE');
+
+    const canApproveGM = isGM || isSuperAdmin;
+    const canApproveCOO = isCOO || isSuperAdmin;
+    const canComplete = isAccounts || isSuperAdmin;
+    const canViewAll = canApproveGM || canApproveCOO || canComplete || user.role === 'admin';
     let payments = await fetchPayments();
 
     if (req.method === 'POST') {
@@ -39,7 +57,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           amount,
           requestedByEmail: user.email,
           requestedByName: profile?.name || user.displayName || user.email,
-          status: 'Pending Approval' as const,
+          status: 'Pending GM Approval' as const,
           submittedAt: now,
           updatedAt: now,
           updatedBy: user.email,
@@ -47,13 +65,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         payments.push(newPayment);
         await savePayments(payments);
 
-        // Add a notification for the admin
+        // Add a notification for the OIMC GM
         await addNotification({
           id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
-          title: 'New Payment Request',
-          body: `₦${amount.toLocaleString('en-NG')} request submitted by ${newPayment.requestedByName} for ${payment}`,
+          title: 'New Payment Request (Pending GM Approval)',
+          body: `₦${amount.toLocaleString('en-NG')} request submitted by ${newPayment.requestedByName} for ${payment}. Needs GM approval.`,
           timestamp: now,
-          recipientEmail: 'admin',
+          recipientEmail: 'vaughaned1965@gmail.com',
           type: 'payment',
           isRead: false,
         });
@@ -62,16 +80,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         if (index < 0) return sendJson(res, 404, { error: 'Payment request not found.' });
         const next = body.status as PaymentStatus;
         const current = payments[index].status;
-        const valid =
-          (canApprove && current === 'Pending Approval' && (next === 'Approved for Processing' || next === 'Rejected')) ||
-          (canComplete && current === 'Approved for Processing' && next === 'Payment Made');
-        if (!canApprove && current === 'Pending Approval') {
-          return sendJson(res, 403, { error: 'Only an administrator can approve or reject this request.' });
+        
+        let valid = false;
+        if (current === 'Pending GM Approval') {
+          valid = canApproveGM && (next === 'Pending COO Approval' || next === 'Rejected');
+          if (!canApproveGM && next === 'Pending COO Approval') {
+            return sendJson(res, 403, { error: 'Only OIMC GM or Super Admin can approve this request at this stage.' });
+          }
+        } else if (current === 'Pending COO Approval') {
+          valid = canApproveCOO && (next === 'Approved for Processing' || next === 'Rejected');
+          if (!canApproveCOO && next === 'Approved for Processing') {
+            return sendJson(res, 403, { error: 'Only OIDC COO or Super Admin can approve this request at this stage.' });
+          }
+        } else if (current === 'Approved for Processing') {
+          valid = canComplete && next === 'Payment Made';
+          if (!canComplete && next === 'Payment Made') {
+            return sendJson(res, 403, { error: 'Only Accounts or Finance can process this payment.' });
+          }
         }
-        if (!canComplete && next === 'Payment Made') {
-          return sendJson(res, 403, { error: 'Only a user in the Accounts or Finance department can mark payment as completed.' });
-        }
-        if (!valid) return sendJson(res, 400, { error: `Cannot change ${current} to ${next}.` });
+
+        if (!valid) return sendJson(res, 400, { error: `Cannot change status from ${current} to ${next}.` });
 
         const rejectionNotes = next === 'Rejected' ? String(body.rejectionNotes || '').trim() : undefined;
 
@@ -90,12 +118,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const requesterEmail = payments[index].requestedByEmail;
         const requesterName = payments[index].requestedByName;
 
-        if (next === 'Approved for Processing') {
+        if (next === 'Pending COO Approval') {
+          // Notify COO
+          await addNotification({
+            id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+            title: 'Payment Request Approved by GM',
+            body: `Payment request for ₦${amtStr} (${payName}) by ${requesterName} has been approved by GM and is pending your COO approval.`,
+            timestamp: new Date().toISOString(),
+            recipientEmail: 'juyinad@gmail.com',
+            type: 'payment',
+            isRead: false,
+          });
+        } else if (next === 'Approved for Processing') {
           // Notify requester
           await addNotification({
             id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
-            title: 'Payment Request Approved',
-            body: `Your payment request for ₦${amtStr} (${payName}) has been approved for processing.`,
+            title: 'Payment Request Approved by COO',
+            body: `Your payment request for ₦${amtStr} (${payName}) has been approved by GM and COO, and sent to Accounts.`,
             timestamp: new Date().toISOString(),
             recipientEmail: requesterEmail,
             type: 'payment',
@@ -106,7 +145,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           await addNotification({
             id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
             title: 'New Payment to Process',
-            body: `Payment request for ₦${amtStr} (${payName}) by ${requesterName} is approved and ready.`,
+            body: `Payment request for ₦${amtStr} (${payName}) by ${requesterName} is approved by GM & COO and ready.`,
             timestamp: new Date().toISOString(),
             recipientEmail: 'accounts',
             type: 'payment',
@@ -143,7 +182,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const visible = canViewAll
       ? payments
       : payments.filter((item) => item.requestedByEmail.toLowerCase() === user.email.toLowerCase());
-    return sendJson(res, 200, { payments: visible, canApprove, canComplete });
+    return sendJson(res, 200, { payments: visible, canApproveGM, canApproveCOO, canComplete });
   } catch (error: any) {
     console.error('Payments API error:', error);
     return sendJson(res, 500, { error: error.message || 'Could not load payment requests.' });

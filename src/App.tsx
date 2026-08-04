@@ -215,7 +215,8 @@ export default function App() {
     ];
   });
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
-  const [canApprovePayments, setCanApprovePayments] = useState(false);
+  const [canApproveGM, setCanApproveGM] = useState(false);
+  const [canApproveCOO, setCanApproveCOO] = useState(false);
   const [canCompletePayments, setCanCompletePayments] = useState(false);
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -388,7 +389,8 @@ export default function App() {
   const refreshPayments = useCallback(async () => {
     const result = await ApiClient.loadPayments();
     setPayments(result.payments);
-    setCanApprovePayments(result.canApprove);
+    setCanApproveGM(result.canApproveGM);
+    setCanApproveCOO(result.canApproveCOO);
     setCanCompletePayments(result.canComplete);
   }, []);
 
@@ -431,7 +433,8 @@ export default function App() {
     try {
       const result = await ApiClient.createPayment(payment);
       setPayments(result.payments);
-      setCanApprovePayments(result.canApprove);
+      setCanApproveGM(result.canApproveGM);
+      setCanApproveCOO(result.canApproveCOO);
       setCanCompletePayments(result.canComplete);
       refreshNotifications().catch(() => {});
     } catch (err: any) {
@@ -448,7 +451,8 @@ export default function App() {
     try {
       const result = await ApiClient.updatePaymentStatus(id, status, rejectionNotes);
       setPayments(result.payments);
-      setCanApprovePayments(result.canApprove);
+      setCanApproveGM(result.canApproveGM);
+      setCanApproveCOO(result.canApproveCOO);
       setCanCompletePayments(result.canComplete);
       refreshNotifications().catch(() => {});
     } catch (err: any) {
@@ -1432,7 +1436,8 @@ export default function App() {
           {currentTab === 'payment' && (
             <PaymentPage
               payments={payments}
-              canApprove={canApprovePayments}
+              canApproveGM={canApproveGM}
+              canApproveCOO={canApproveCOO}
               canComplete={canCompletePayments}
               isSaving={isSavingPayment}
               accountingCodes={accountingCodes}

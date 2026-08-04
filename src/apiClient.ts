@@ -106,18 +106,18 @@ export const ApiClient = {
   },
 
   loadPayments() {
-    return apiFetch<{ payments: PaymentRequest[]; canApprove: boolean; canComplete: boolean }>('/api/payments');
+    return apiFetch<{ payments: PaymentRequest[]; canApproveGM: boolean; canApproveCOO: boolean; canComplete: boolean }>('/api/payments');
   },
 
   createPayment(payment: Pick<PaymentRequest, 'code' | 'payment' | 'description' | 'amount'>) {
-    return apiFetch<{ payments: PaymentRequest[]; canApprove: boolean; canComplete: boolean }>('/api/payments', {
+    return apiFetch<{ payments: PaymentRequest[]; canApproveGM: boolean; canApproveCOO: boolean; canComplete: boolean }>('/api/payments', {
       method: 'POST',
       body: JSON.stringify({ action: 'create', payment }),
     });
   },
 
   updatePaymentStatus(id: string, status: PaymentStatus, rejectionNotes?: string) {
-    return apiFetch<{ payments: PaymentRequest[]; canApprove: boolean; canComplete: boolean }>('/api/payments', {
+    return apiFetch<{ payments: PaymentRequest[]; canApproveGM: boolean; canApproveCOO: boolean; canComplete: boolean }>('/api/payments', {
       method: 'POST',
       body: JSON.stringify({ action: 'updateStatus', id, status, rejectionNotes }),
     });

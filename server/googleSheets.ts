@@ -175,7 +175,7 @@ function parsePayments(raw: string[][]): PaymentRequest[] {
     amount: Number(row[4] || 0),
     requestedByEmail: row[5] || '',
     requestedByName: row[6] || '',
-    status: (row[7] || 'Pending Approval') as PaymentRequest['status'],
+    status: (row[7] || 'Pending GM Approval') as PaymentRequest['status'],
     submittedAt: row[8] || '',
     updatedAt: row[9] || '',
     updatedBy: row[10] || '',

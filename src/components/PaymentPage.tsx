@@ -5,7 +5,8 @@ import { splitAccountingCode } from '../data/accountingCodes';
 
 interface PaymentPageProps {
   payments: PaymentRequest[];
-  canApprove: boolean;
+  canApproveGM: boolean;
+  canApproveCOO: boolean;
   canComplete: boolean;
   isSaving: boolean;
   accountingCodes: string[];
@@ -15,7 +16,8 @@ interface PaymentPageProps {
 }
 
 const statusStyles: Record<PaymentStatus, string> = {
-  'Pending Approval': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Pending GM Approval': 'bg-amber-50 text-amber-700 border-amber-200',
+  'Pending COO Approval': 'bg-indigo-50 text-indigo-700 border-indigo-200',
   'Approved for Processing': 'bg-blue-50 text-blue-700 border-blue-200',
   Rejected: 'bg-rose-50 text-rose-700 border-rose-200',
   'Payment Made': 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -23,7 +25,8 @@ const statusStyles: Record<PaymentStatus, string> = {
 
 export default function PaymentPage({
   payments,
-  canApprove,
+  canApproveGM,
+  canApproveCOO,
   canComplete,
   isSaving,
   accountingCodes,
@@ -34,7 +37,7 @@ export default function PaymentPage({
   const [form, setForm] = useState({ code: '', payment: '', description: '', amount: '' });
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState('');
-  const canManage = canApprove || canComplete;
+  const canManage = canApproveGM || canApproveCOO || canComplete;
   const sortedPayments = useMemo(
     () => [...payments].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     [payments]
@@ -59,10 +62,10 @@ export default function PaymentPage({
             <h2 className="text-xl font-extrabold">Payment Requests</h2>
             <p className="mt-1 text-sm text-slate-300">
               {canManage
-                ? canApprove && canComplete
+                ? canApproveGM && canApproveCOO && canComplete
                   ? 'Approve requests and confirm completed payments.'
-                  : canApprove
-                    ? 'Review staff requests and approve them for Accounts to process.'
+                  : canApproveGM || canApproveCOO
+                    ? 'Review staff requests and approve them to advance.'
                     : 'Process approved requests and confirm completed payments.'
                 : 'Submit a payment request and follow its progress through to payment.'}
             </p>
@@ -122,7 +125,18 @@ export default function PaymentPage({
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 p-5">
           <h3 className="font-bold text-slate-800">{canManage ? 'Payment requests' : 'My requests'}</h3>
-          {canManage && <span className="flex items-center gap-1 text-xs font-bold text-slate-500"><ShieldCheck className="h-4 w-4" /> {canApprove ? 'Admin approval' : 'Accounts processing'}</span>}
+          {canManage && (
+            <span className="flex items-center gap-1 text-xs font-bold text-slate-500">
+              <ShieldCheck className="h-4 w-4" />{' '}
+              {canApproveGM && canApproveCOO
+                ? 'Admin approval'
+                : canApproveGM
+                ? 'GM approval'
+                : canApproveCOO
+                ? 'COO approval'
+                : 'Accounts processing'}
+            </span>
+          )}
         </div>
         {sortedPayments.length === 0 ? (
           <div className="p-12 text-center text-sm text-slate-500">No payment requests yet.</div>
@@ -155,23 +169,38 @@ export default function PaymentPage({
                     <td className="p-4 text-xs text-slate-500">{new Date(item.submittedAt).toLocaleString()}</td>
                     {canManage && (
                       <td className="p-4">
-                        {canApprove && item.status === 'Pending Approval' ? (
-                          <div className="flex gap-2">
-                            <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Approved for Processing')}
-                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer">Approve</button>
-                            <button disabled={isSaving} onClick={() => { setRejectingId(item.id); setRejectionNotes(''); }}
-                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">Reject</button>
-                          </div>
-                        ) : canComplete && item.status === 'Approved for Processing' ? (
-                          <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Payment Made')}
-                            className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">Mark Payment Made</button>
+                        {item.status === 'Pending GM Approval' ? (
+                          canApproveGM ? (
+                            <div className="flex gap-2">
+                              <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Pending COO Approval')}
+                                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer">Approve (GM)</button>
+                              <button disabled={isSaving} onClick={() => { setRejectingId(item.id); setRejectionNotes(''); }}
+                                className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">Reject</button>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">Waiting for GM Approval</span>
+                          )
+                        ) : item.status === 'Pending COO Approval' ? (
+                          canApproveCOO ? (
+                            <div className="flex gap-2">
+                              <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Approved for Processing')}
+                                className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">Approve (COO)</button>
+                              <button disabled={isSaving} onClick={() => { setRejectingId(item.id); setRejectionNotes(''); }}
+                                className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50 cursor-pointer">Reject</button>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">Waiting for COO Approval</span>
+                          )
+                        ) : item.status === 'Approved for Processing' ? (
+                          canComplete ? (
+                            <button disabled={isSaving} onClick={() => onUpdateStatus(item.id, 'Payment Made')}
+                              className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer">Mark Payment Made</button>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-400">Sent to Accounts</span>
+                          )
                         ) : (
                           <span className="text-xs font-medium text-slate-400">
-                            {item.status === 'Pending Approval'
-                              ? 'Waiting for Admin'
-                              : item.status === 'Approved for Processing'
-                                ? 'Sent to Accounts'
-                                : 'Completed'}
+                            {item.status === 'Payment Made' ? 'Completed' : 'Rejected'}
                           </span>
                         )}
                       </td>

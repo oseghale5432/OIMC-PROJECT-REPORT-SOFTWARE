@@ -51,7 +51,8 @@ export interface SpreadsheetConfig {
 }
 
 export type PaymentStatus =
-  | 'Pending Approval'
+  | 'Pending GM Approval'
+  | 'Pending COO Approval'
   | 'Approved for Processing'
   | 'Rejected'
   | 'Payment Made';
