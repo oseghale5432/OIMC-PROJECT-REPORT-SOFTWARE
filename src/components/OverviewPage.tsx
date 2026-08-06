@@ -484,8 +484,17 @@ export default function OverviewPage({
                         {/* Task grid columns (Task 1 to Task 15) */}
                         {taskStates.map((state, i) => {
                           const taskItem = report?.tasks[i];
+                          let statusLabel = '';
+                          if (taskItem?.completed === true) {
+                            statusLabel = `COMPLETED in ${taskItem.completedMonth || selectedMonth}`;
+                          } else if (taskItem?.completed === false) {
+                            statusLabel = taskItem.carriedOverFrom 
+                              ? `PENDING (Carried over from ${taskItem.carriedOverFrom})` 
+                              : 'PENDING';
+                          }
+
                           const tooltipText = taskItem?.description 
-                            ? `Task ${i + 1}: "${taskItem.description}" - ${taskItem.completed ? 'COMPLETED' : 'PENDING'}` 
+                            ? `Task ${i + 1}: "${taskItem.description}" - ${statusLabel}` 
                             : `Task ${i + 1}: No task assigned`;
 
                           let bgClass = 'bg-slate-100/60 text-slate-300';
@@ -495,7 +504,9 @@ export default function OverviewPage({
                             bgClass = 'bg-emerald-50 text-emerald-600 rounded border border-emerald-200';
                             content = <CheckCircle2 className="w-4 h-4" />;
                           } else if (state === 0) {
-                            bgClass = 'bg-red-50 text-red-600 rounded border border-red-200';
+                            bgClass = taskItem?.carriedOverFrom 
+                              ? 'bg-sky-50 text-sky-600 rounded border border-sky-200' 
+                              : 'bg-red-50 text-red-600 rounded border border-red-200';
                             content = <XCircle className="w-4 h-4" />;
                           }
 

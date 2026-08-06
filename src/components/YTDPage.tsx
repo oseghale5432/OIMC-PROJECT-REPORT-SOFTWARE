@@ -71,8 +71,12 @@ export default function YTDPage({
     .filter(Boolean);
   const uniqueContractorHeads = Array.from(new Set(normalizedContractorHeads));
 
+  const [viewMode, setViewMode] = useState<'ACTIVE' | 'COMPLETED' | 'ALL'>('ACTIVE');
+
   // Filtered tasks
   const filteredTasks = tasks.filter((task) => {
+    const isCompleted = task.status.toLowerCase().includes('complete') || task.status.toLowerCase().includes('done') || !!task.completedMonth;
+
     const matchesSearch = 
       task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.lead.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,14 +87,21 @@ export default function YTDPage({
     
     let matchesStatus = true;
     if (statusFilter === 'COMPLETED') {
-      matchesStatus = task.status.toLowerCase().includes('complete') || task.status.toLowerCase().includes('done');
+      matchesStatus = isCompleted;
     } else if (statusFilter === 'IN_PROGRESS') {
-      matchesStatus = task.status !== '' && !task.status.toLowerCase().includes('complete') && !task.status.toLowerCase().includes('done');
+      matchesStatus = task.status !== '' && !isCompleted;
     } else if (statusFilter === 'NOT_STARTED') {
-      matchesStatus = task.status === '';
+      matchesStatus = task.status === '' && !isCompleted;
     }
 
-    return matchesSearch && matchesDept && matchesStatus;
+    let matchesViewMode = true;
+    if (viewMode === 'ACTIVE') {
+      matchesViewMode = !isCompleted;
+    } else if (viewMode === 'COMPLETED') {
+      matchesViewMode = isCompleted;
+    }
+
+    return matchesSearch && matchesDept && matchesStatus && matchesViewMode;
   });
 
   const handleCreate = (e: React.FormEvent) => {
@@ -354,14 +365,40 @@ export default function YTDPage({
 
       {/* Spreadsheet Grid Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50">
           <div className="flex items-center space-x-2">
             <div className="w-2.5 h-2.5 bg-orange-500 rounded-full"></div>
             <h2 className="font-sans font-bold text-slate-800 text-sm">
-              2026 ACTIVE WORK PROJECTS ({filteredTasks.length})
+              {viewMode === 'ACTIVE' ? '2026 ACTIVE WORK PROJECTS' : viewMode === 'COMPLETED' ? 'COMPLETED & ARCHIVED PROJECTS' : 'ALL 2026 WORK PROJECTS'} ({filteredTasks.length})
             </h2>
           </div>
-          <span className="text-xs font-mono text-slate-400">Year-To-Date Monitoring Tab</span>
+
+          <div className="flex items-center space-x-1.5 bg-slate-200 p-1 rounded-lg text-xs font-bold">
+            <button
+              onClick={() => setViewMode('ACTIVE')}
+              className={`px-3 py-1 rounded-md transition-all ${
+                viewMode === 'ACTIVE' ? 'bg-orange-500 text-white shadow' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Active YTD Tasks
+            </button>
+            <button
+              onClick={() => setViewMode('COMPLETED')}
+              className={`px-3 py-1 rounded-md transition-all ${
+                viewMode === 'COMPLETED' ? 'bg-emerald-600 text-white shadow' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Completed Archive
+            </button>
+            <button
+              onClick={() => setViewMode('ALL')}
+              className={`px-3 py-1 rounded-md transition-all ${
+                viewMode === 'ALL' ? 'bg-slate-800 text-white shadow' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -564,7 +601,11 @@ export default function YTDPage({
                             ))}
                           </select>
                         ) : (
-                          task.status ? (
+                          task.completedMonth ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              COMPLETED IN {task.completedMonth.toUpperCase()}
+                            </span>
+                          ) : task.status ? (
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                               task.status.toLowerCase().includes('commenced') || task.status.toLowerCase().includes('progress')
                                 ? 'bg-sky-50 text-sky-700 border border-sky-150'

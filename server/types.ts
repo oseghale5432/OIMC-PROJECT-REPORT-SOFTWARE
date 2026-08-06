@@ -10,6 +10,9 @@ export interface YTDTask {
   daysRemaining: number;
   status: string;
   remark: string;
+  completedMonth?: string;
+  completedAt?: string;
+  carriedOverFrom?: string;
 }
 
 export interface StaffMember {
@@ -28,6 +31,9 @@ export interface TaskItem {
   description: string;
   completed: boolean | null;
   ytdTaskId?: string;
+  completedMonth?: string;
+  completedAt?: string;
+  carriedOverFrom?: string;
 }
 
 export interface MonthProgress {

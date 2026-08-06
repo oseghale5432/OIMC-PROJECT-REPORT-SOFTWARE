@@ -15,6 +15,9 @@ export interface YTDTask {
   daysRemaining: number;
   status: string;
   remark: string;
+  completedMonth?: string;
+  completedAt?: string;
+  carriedOverFrom?: string;
 }
 
 export interface StaffMember {
@@ -33,6 +36,9 @@ export interface TaskItem {
   description: string;
   completed: boolean | null; // true (1), false (0), null (-1 or no task)
   ytdTaskId?: string; // ID of the linked YTD Task
+  completedMonth?: string;
+  completedAt?: string;
+  carriedOverFrom?: string;
 }
 
 export interface MonthProgress {

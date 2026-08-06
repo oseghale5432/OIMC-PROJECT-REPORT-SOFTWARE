@@ -61,6 +61,14 @@ export default function StaffProgressPage({
     (task) => task.department.toLowerCase() === currentStaff.department.toLowerCase()
   );
 
+  // Active linkable YTD tasks exclude tasks that were completed in a prior month
+  const activeLinkableYTDTasks = linkableYTDTasks.filter((task) => {
+    if (task.completedMonth && task.completedMonth !== activeMonth) return false;
+    const isStatusCompleted = task.status.toLowerCase().includes('complete') || task.status.toLowerCase() === 'done';
+    if (isStatusCompleted && task.completedMonth && task.completedMonth !== activeMonth) return false;
+    return true;
+  });
+
   const buildBlankReports = (staff: StaffMember): MonthProgress[] => (
     MONTHS.map((month) => ({
       id: `${staff.email}_${month}`,
@@ -82,6 +90,64 @@ export default function StaffProgressPage({
   useEffect(() => {
     setEditedYTDTasks(JSON.parse(JSON.stringify(tasks)));
   }, [tasks]);
+
+  // Carry over pending tasks from previous month into active month while keeping completed tasks in previous month
+  const handleCarryOverFromPrevMonth = (targetMonth: string) => {
+    const currentMonthIdx = MONTHS.indexOf(targetMonth);
+    if (currentMonthIdx <= 0) return;
+
+    const prevMonth = MONTHS[currentMonthIdx - 1];
+    const prevReport = editedReports.find((r) => r.month === prevMonth);
+    const targetReport = editedReports.find((r) => r.month === targetMonth);
+
+    if (!prevReport || !targetReport) return;
+
+    // Filter tasks from previous month
+    const pendingTasksFromPrev = prevReport.tasks.filter(
+      (t) => (t.description || t.ytdTaskId) && t.completed !== true
+    );
+    const completedTasksFromPrev = prevReport.tasks.filter(
+      (t) => t.completed === true
+    );
+
+    if (pendingTasksFromPrev.length === 0) {
+      alert(`No pending tasks found in ${prevMonth} to carry over.`);
+      return;
+    }
+
+    // Merge into target month slots without overwriting completed ones in target
+    const updatedTargetTasks = [...targetReport.tasks];
+    let slotsFilled = 0;
+
+    pendingTasksFromPrev.forEach((prevTask) => {
+      // Check if task is already in target month
+      const alreadyPresent = updatedTargetTasks.some(
+        (tt) => (prevTask.ytdTaskId && tt.ytdTaskId === prevTask.ytdTaskId) ||
+                (prevTask.description && tt.description === prevTask.description)
+      );
+
+      if (!alreadyPresent) {
+        // Find first empty slot
+        const emptyIdx = updatedTargetTasks.findIndex((tt) => !tt.description && !tt.ytdTaskId);
+        if (emptyIdx !== -1) {
+          updatedTargetTasks[emptyIdx] = {
+            ...prevTask,
+            completed: false,
+            carriedOverFrom: prevMonth,
+            completedMonth: undefined,
+            completedAt: undefined,
+          };
+          slotsFilled++;
+        }
+      }
+    });
+
+    setEditedReports((prev) =>
+      prev.map((r) => (r.month === targetMonth ? { ...r, tasks: updatedTargetTasks } : r))
+    );
+
+    alert(`Successfully carried over ${slotsFilled} pending task(s) from ${prevMonth} to ${targetMonth}. ${completedTasksFromPrev.length} task(s) completed in ${prevMonth} remain recorded in ${prevMonth}.`);
+  };
 
   // Handle linking a task to a YTD task
   const handleLinkYTDTask = (month: string, taskIdx: number, ytdTaskId: string) => {
@@ -121,6 +187,8 @@ export default function StaffProgressPage({
 
   // Toggle completed status (completed: true, incomplete: false, no task: null)
   const handleStatusToggle = (month: string, taskIdx: number) => {
+    const nowIso = new Date().toISOString();
+
     setEditedReports((prev) => 
       prev.map((r) => {
         if (r.month === month) {
@@ -129,16 +197,42 @@ export default function StaffProgressPage({
           
           if (task && (task.description || task.ytdTaskId)) {
             let nextCompleted = false;
+            let completedMonth: string | undefined = undefined;
+            let completedAt: string | undefined = undefined;
+
             if (task.completed === false) {
               nextCompleted = true; // Complete
+              completedMonth = month;
+              completedAt = nowIso;
             } else if (task.completed === true) {
               nextCompleted = false; // Incomplete
+              completedMonth = undefined;
+              completedAt = undefined;
             }
 
             updatedTasks[taskIdx] = {
               ...task,
               completed: nextCompleted,
+              completedMonth,
+              completedAt,
             };
+
+            // Update linked YTD Task status dynamically if present
+            if (task.ytdTaskId) {
+              setEditedYTDTasks((prevYtd) =>
+                prevYtd.map((t) => {
+                  if (t.id === task.ytdTaskId) {
+                    return {
+                      ...t,
+                      status: nextCompleted ? 'Completed' : 'Work commenced',
+                      completedMonth,
+                      completedAt,
+                    };
+                  }
+                  return t;
+                })
+              );
+            }
           }
           return { ...r, tasks: updatedTasks };
         }
@@ -149,8 +243,14 @@ export default function StaffProgressPage({
 
   // Update Status of linked YTD Task
   const handleUpdateLinkedStatus = (ytdTaskId: string, newStatus: string) => {
+    const isCompleted = newStatus.toLowerCase().includes('complete') || newStatus.toLowerCase() === 'done';
     setEditedYTDTasks((prev) =>
-      prev.map((t) => (t.id === ytdTaskId ? { ...t, status: newStatus } : t))
+      prev.map((t) => (t.id === ytdTaskId ? { 
+        ...t, 
+        status: newStatus,
+        completedMonth: isCompleted ? (t.completedMonth || activeMonth) : undefined,
+        completedAt: isCompleted ? (t.completedAt || new Date().toISOString()) : undefined,
+      } : t))
     );
   };
 
@@ -171,6 +271,13 @@ export default function StaffProgressPage({
 
   // Get active report
   const activeReport = editedReports.find((r) => r.month === activeMonth);
+
+  // Compute prev month stats for carryover banner
+  const activeMonthIdx = MONTHS.indexOf(activeMonth);
+  const prevMonthName = activeMonthIdx > 0 ? MONTHS[activeMonthIdx - 1] : null;
+  const prevReportData = prevMonthName ? editedReports.find((r) => r.month === prevMonthName) : null;
+  const prevPendingTasks = prevReportData ? prevReportData.tasks.filter((t) => (t.description || t.ytdTaskId) && t.completed !== true) : [];
+  const prevCompletedTasks = prevReportData ? prevReportData.tasks.filter((t) => t.completed === true) : [];
 
   return (
     <div className="space-y-6">
@@ -230,6 +337,33 @@ export default function StaffProgressPage({
           <div>Month: <span className="font-bold text-emerald-400">{activeMonth.toUpperCase()} 2026</span></div>
         </div>
       </div>
+
+      {/* Carryover Banner for Active Month */}
+      {prevMonthName && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 shadow-sm">
+          <div className="flex items-start space-x-3">
+            <Compass className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-sans font-bold text-xs uppercase tracking-wide text-amber-800">
+                Monthly Task Carryover ({prevMonthName} → {activeMonth})
+              </h4>
+              <p className="text-xs text-amber-700 mt-0.5">
+                <span className="font-semibold text-emerald-700">{prevCompletedTasks.length} task(s) completed in {prevMonthName}</span> stay recorded in {prevMonthName}.{' '}
+                <span className="font-semibold text-amber-800">{prevPendingTasks.length} pending task(s)</span> can be carried over into {activeMonth}.
+              </p>
+            </div>
+          </div>
+          {prevPendingTasks.length > 0 && (
+            <button
+              onClick={() => handleCarryOverFromPrevMonth(activeMonth)}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-sans font-bold text-xs px-4 py-2 rounded-lg shadow-sm flex items-center space-x-1.5 whitespace-nowrap transition-colors"
+            >
+              <span>Carry Over Pending Tasks to {activeMonth}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Month Selection Ribbon */}
       <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-2 overflow-x-auto scrollbar-hide">
@@ -295,6 +429,24 @@ export default function StaffProgressPage({
                       </h4>
                     </div>
 
+                    {/* Completion / Carryover Badges */}
+                    <div className="flex items-center space-x-1.5">
+                      {task.completed === true && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
+                          COMPLETED IN {(task.completedMonth || activeMonth).toUpperCase()}
+                        </span>
+                      )}
+                      {task.completed === false && task.carriedOverFrom && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200 uppercase">
+                          CARRIED OVER FROM {task.carriedOverFrom.toUpperCase()}
+                        </span>
+                      )}
+                      {task.completed === false && !task.carriedOverFrom && (task.description || isLinked) && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 uppercase">
+                          PENDING
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Card Main Body */}
@@ -310,7 +462,7 @@ export default function StaffProgressPage({
                         className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg p-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-orange-500"
                       >
                         <option value="">-- Select a staff task --</option>
-                        {linkableYTDTasks.map((t) => (
+                        {activeLinkableYTDTasks.map((t) => (
                           <option key={t.id} value={t.id}>
                             {t.description.substring(0, 70)}{t.description.length > 70 ? '…' : ''} ({t.lead})
                           </option>
