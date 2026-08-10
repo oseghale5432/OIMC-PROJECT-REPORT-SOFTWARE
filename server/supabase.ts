@@ -4,15 +4,31 @@ import * as googleSheets from './googleSheets.js';
 
 let supabaseClientInstance: SupabaseClient | null = null;
 
+function sanitizeSupabaseUrl(rawUrl: string): string {
+  let urlStr = rawUrl.trim();
+  const dashMatch = urlStr.match(/supabase\.com\/dashboard\/project\/([a-z0-9]+)/i);
+  if (dashMatch && dashMatch[1]) {
+    return `https://${dashMatch[1]}.supabase.co`;
+  }
+  try {
+    const parsed = new URL(urlStr);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return urlStr.replace(/\/+$/, '');
+  }
+}
+
 function getSupabaseClient(): SupabaseClient {
   if (supabaseClientInstance) return supabaseClientInstance;
 
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const rawUrl = process.env.SUPABASE_URL?.trim();
   const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
+  if (!rawUrl || !supabaseServiceRoleKey) {
     throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   }
+
+  const supabaseUrl = sanitizeSupabaseUrl(rawUrl);
 
   supabaseClientInstance = createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {

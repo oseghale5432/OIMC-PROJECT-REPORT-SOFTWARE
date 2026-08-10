@@ -133,16 +133,20 @@ async function innerHandler(req: ApiRequest, res: ApiResponse) {
         })
       );
 
-      // Store in notifications database
-      await addNotification({
-        id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
-        title,
-        body: message,
-        timestamp: new Date().toISOString(),
-        recipientEmail: recipientEmail || 'all',
-        type: 'broadcast',
-        isRead: false,
-      });
+      // Store in notifications database (gracefully catch if table is missing or DB fails)
+      try {
+        await addNotification({
+          id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
+          title,
+          body: message,
+          timestamp: new Date().toISOString(),
+          recipientEmail: recipientEmail || 'all',
+          type: 'broadcast',
+          isRead: false,
+        });
+      } catch (dbErr: any) {
+        console.warn('Failed to store notification record in database:', dbErr);
+      }
 
       return sendJson(res, 200, { delivered: results.filter((r) => r.status === 'sent').length, results });
     } catch (error: any) {

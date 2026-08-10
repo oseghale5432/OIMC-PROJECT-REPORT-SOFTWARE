@@ -21,10 +21,18 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   }
 
   if (!res.ok) {
-    const fallback = responseText
-      ? responseText.replace(/\s+/g, ' ').trim().slice(0, 220)
-      : 'No response body.';
-    throw new Error(data.error || `Server request failed (${res.status} ${res.statusText}): ${fallback}`);
+    let errorMsg = data?.error;
+    if (!errorMsg) {
+      if (responseText && (responseText.trim().startsWith('<') || responseText.includes('<html'))) {
+        errorMsg = `Server returned an HTML response (${res.status} ${res.statusText}). Please check your server endpoint and database settings.`;
+      } else {
+        const fallback = responseText
+          ? responseText.replace(/\s+/g, ' ').trim().slice(0, 220)
+          : 'No response body.';
+        errorMsg = `Server request failed (${res.status} ${res.statusText}): ${fallback}`;
+      }
+    }
+    throw new Error(errorMsg);
   }
   return data as T;
 }
