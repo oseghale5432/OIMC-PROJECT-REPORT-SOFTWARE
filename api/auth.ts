@@ -28,7 +28,7 @@ async function innerHandler(req: ApiRequest, res: ApiResponse) {
       if (!email || !password) return sendJson(res, 400, { error: 'Email and password are required.' });
 
       const workbook = await fetchWorkbook();
-      const staff = workbook.staff.find((s) => s.email.toLowerCase() === email);
+      const staff = workbook.staff.find((s) => s.email?.trim().toLowerCase() === email);
       if (!staff) return sendJson(res, 401, { error: 'This email address is not registered.' });
       if (!verifyPassword(password, staff.password)) return sendJson(res, 401, { error: 'The password you entered is incorrect.' });
 

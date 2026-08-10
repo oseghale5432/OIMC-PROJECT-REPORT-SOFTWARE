@@ -145,8 +145,37 @@ export function getDatabaseId() {
   }
 }
 
+export function ensureStaffDefaults(staffList: StaffMember[]): StaffMember[] {
+  const list = [...(staffList || [])];
+  const superAdminEmail = 'oseghale5432@gmail.com';
+  const adminIndex = list.findIndex(s => s.email?.trim().toLowerCase() === superAdminEmail);
+
+  if (adminIndex === -1) {
+    list.push({
+      email: superAdminEmail,
+      name: 'Super Admin',
+      department: 'MANAGEMENT',
+      activity: 'SUPER ADMIN',
+      label: 'Super Admin',
+      isNew: false,
+      role: 'admin',
+      password: 'admin123',
+      isFirstLogin: true,
+    });
+  } else {
+    const admin = list[adminIndex];
+    if (admin.name === 'Admin Boss') admin.name = 'Super Admin';
+    if (!admin.label || admin.label.includes('Admin Boss')) admin.label = 'Super Admin';
+    if (!admin.password) {
+      admin.password = 'admin123';
+      admin.isFirstLogin = true;
+    }
+  }
+  return list;
+}
+
 export async function fetchWorkbook() {
-  return runWithFallback(
+  const workbook = await runWithFallback(
     async () => {
       const [ytdTasks, staff, progressReports] = await Promise.all([
         readCollection<YTDTask>('ytd_tasks'),
@@ -161,6 +190,11 @@ export async function fetchWorkbook() {
     },
     () => googleSheets.fetchWorkbook()
   );
+
+  return {
+    ...workbook,
+    staff: ensureStaffDefaults(workbook.staff),
+  };
 }
 
 export async function saveYTDTasks(tasks: YTDTask[]) {
