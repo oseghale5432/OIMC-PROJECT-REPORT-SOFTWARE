@@ -105,20 +105,44 @@ async function replaceCollection<T>(
   const supabase = getSupabaseClient();
 
   if (values.length > 0) {
-    const payloads = values.map((val) => ({
+    const fullPayloads = values.map((val) => ({
       id: idFor(val),
       data: clean(val),
       ...clean(val),
     }));
 
-    for (let i = 0; i < payloads.length; i += 100) {
-      const chunk = payloads.slice(i, i + 100);
+    const jsonbPayloads = values.map((val) => ({
+      id: idFor(val),
+      data: clean(val),
+    }));
+
+    for (let i = 0; i < fullPayloads.length; i += 100) {
+      const chunk = fullPayloads.slice(i, i + 100);
       const { error: upsertError } = await supabase
         .from(tableName)
         .upsert(chunk);
+
       if (upsertError) {
-        console.error(`Supabase upsert error on "${tableName}":`, upsertError);
-        throw upsertError;
+        // If Supabase rejects top-level properties (e.g. column 'coWorker' missing in schema cache), retry with JSONB payload
+        const isColumnError =
+          upsertError.message?.toLowerCase().includes('column') ||
+          upsertError.message?.includes('schema cache') ||
+          upsertError.code === 'PGRST204';
+
+        if (isColumnError) {
+          console.warn(`Supabase schema missing column on "${tableName}". Saving into JSONB "data" column...`);
+          const jsonbChunk = jsonbPayloads.slice(i, i + 100);
+          const { error: jsonbError } = await supabase
+            .from(tableName)
+            .upsert(jsonbChunk);
+          if (jsonbError) {
+            console.error(`Supabase JSONB upsert error on "${tableName}":`, jsonbError);
+            throw jsonbError;
+          }
+        } else {
+          console.error(`Supabase upsert error on "${tableName}":`, upsertError);
+          throw upsertError;
+        }
       }
     }
   }

@@ -193,7 +193,7 @@ function parsePayments(raw: string[][]): PaymentRequest[] {
 }
 
 export async function fetchWorkbook() {
-  const ranges = ['YTD_Tasks!A1:K200', 'Staff_Profiles!A1:I500', 'Progress_Reports!A1:AH5000'];
+  const ranges = ['YTD_Tasks!A1:K10000', 'Staff_Profiles!A1:I10000', 'Progress_Reports!A1:AH10000'];
   const query = ranges.map((range) => `ranges=${encodeURIComponent(range)}`).join('&');
   const data = await sheetsFetch(`/values:batchGet?${query}`);
   const valueRanges = data.valueRanges || [];
@@ -206,6 +206,28 @@ export async function fetchWorkbook() {
 }
 
 export async function saveYTDTasks(tasks: YTDTask[]) {
+  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) return;
+
+  let existingTasks: YTDTask[] = [];
+  try {
+    const rawData = await sheetsFetch(`/values/${encodeURIComponent('YTD_Tasks!A1:K10000')}`);
+    existingTasks = parseYTDTasks(rawData.values || []);
+  } catch (e) {
+    console.warn('Could not read existing YTD_Tasks sheet for merge:', e);
+  }
+
+  const taskMap = new Map<string, YTDTask>();
+  existingTasks.forEach((t) => {
+    if (t && t.id) taskMap.set(t.id, t);
+  });
+  tasks.forEach((t) => {
+    if (t && t.id) {
+      const existing = taskMap.get(t.id);
+      taskMap.set(t.id, { ...existing, ...t });
+    }
+  });
+
+  const mergedTasks = Array.from(taskMap.values());
   const headers = [
     'Task ID',
     'Department',
@@ -220,7 +242,7 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
     'Remark',
   ];
 
-  const rows = tasks.map((t, idx) => [
+  const rows = mergedTasks.map((t, idx) => [
     t.id,
     t.department,
     t.lead,
@@ -234,11 +256,34 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
     t.remark,
   ]);
 
-  await clearRange('YTD_Tasks!A2:K10000');
+  await clearRange(`YTD_Tasks!A2:K${Math.max(10000, mergedTasks.length + 10)}`);
   await updateRange('YTD_Tasks!A1:K', [headers, ...rows]);
 }
 
 export async function saveStaffProfiles(staff: StaffMember[]) {
+  if (!staff || !Array.isArray(staff) || staff.length === 0) return;
+
+  let existingStaff: StaffMember[] = [];
+  try {
+    const rawData = await sheetsFetch(`/values/${encodeURIComponent('Staff_Profiles!A1:I10000')}`);
+    existingStaff = parseStaff(rawData.values || []);
+  } catch (e) {
+    console.warn('Could not read existing Staff_Profiles sheet for merge:', e);
+  }
+
+  const staffMap = new Map<string, StaffMember>();
+  existingStaff.forEach((s) => {
+    if (s && s.email) staffMap.set(s.email.toLowerCase(), s);
+  });
+  staff.forEach((s) => {
+    if (s && s.email) {
+      const email = s.email.toLowerCase();
+      const existing = staffMap.get(email);
+      staffMap.set(email, { ...existing, ...s });
+    }
+  });
+
+  const mergedStaff = Array.from(staffMap.values());
   const headers = [
     'Email',
     'Name',
@@ -251,7 +296,7 @@ export async function saveStaffProfiles(staff: StaffMember[]) {
     'Is First Login (TRUE/FALSE)',
   ];
 
-  const rows = staff.map((s) => [
+  const rows = mergedStaff.map((s) => [
     s.email,
     s.name,
     s.department,
@@ -263,11 +308,33 @@ export async function saveStaffProfiles(staff: StaffMember[]) {
     s.isFirstLogin === false ? 'FALSE' : 'TRUE',
   ]);
 
-  await clearRange('Staff_Profiles!A2:I10000');
+  await clearRange(`Staff_Profiles!A2:I${Math.max(10000, mergedStaff.length + 10)}`);
   await updateRange('Staff_Profiles!A1:I', [headers, ...rows]);
 }
 
 export async function saveProgressReports(reports: MonthProgress[]) {
+  if (!reports || !Array.isArray(reports) || reports.length === 0) return;
+
+  let existingReports: MonthProgress[] = [];
+  try {
+    const rawData = await sheetsFetch(`/values/${encodeURIComponent('Progress_Reports!A1:AH10000')}`);
+    existingReports = parseProgressReports(rawData.values || []);
+  } catch (e) {
+    console.warn('Could not read existing Progress_Reports sheet for merge:', e);
+  }
+
+  const reportMap = new Map<string, MonthProgress>();
+  existingReports.forEach((r) => {
+    if (r && r.id) reportMap.set(r.id, r);
+  });
+  reports.forEach((r) => {
+    if (r && r.id) {
+      const existing = reportMap.get(r.id);
+      reportMap.set(r.id, { ...existing, ...r });
+    }
+  });
+
+  const mergedReports = Array.from(reportMap.values());
   const headers = [
     'Report ID',
     'Staff Email',
@@ -277,7 +344,7 @@ export async function saveProgressReports(reports: MonthProgress[]) {
     ...Array.from({ length: 15 }, (_, i) => `Task_${i + 1}_Completed`),
   ];
 
-  const rows = reports.map((r) => {
+  const rows = mergedReports.map((r) => {
     const row = [r.id, r.staffEmail, r.month, r.activity];
     for (let i = 0; i < 15; i++) {
       const task = r.tasks[i];
@@ -291,7 +358,7 @@ export async function saveProgressReports(reports: MonthProgress[]) {
     return row;
   });
 
-  await clearRange('Progress_Reports!A2:AH10000');
+  await clearRange(`Progress_Reports!A2:AH${Math.max(10000, mergedReports.length + 10)}`);
   await updateRange('Progress_Reports!A1:AH', [headers, ...rows]);
 }
 
