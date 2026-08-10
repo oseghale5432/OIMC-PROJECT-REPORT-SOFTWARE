@@ -162,6 +162,63 @@ export function ensureStaffDefaults(staffList: StaffMember[]): StaffMember[] {
   return list;
 }
 
+export function recoverStaffFromReportsAndTasks(
+  staffList: StaffMember[],
+  reports: MonthProgress[],
+  tasks: YTDTask[]
+): StaffMember[] {
+  const staffMap = new Map<string, StaffMember>();
+
+  // 1. Add all existing staff profiles
+  (staffList || []).forEach((s) => {
+    if (s && s.email) {
+      staffMap.set(s.email.trim().toLowerCase(), {
+        ...s,
+        email: s.email.trim().toLowerCase(),
+      });
+    }
+  });
+
+  // 2. Auto-recover staff emails & activities from progress reports
+  (reports || []).forEach((r) => {
+    if (r && r.staffEmail) {
+      const email = r.staffEmail.trim().toLowerCase();
+      if (!staffMap.has(email)) {
+        const rawName = email.split('@')[0].replace(/[._-]/g, ' ');
+        const derivedName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+        staffMap.set(email, {
+          email,
+          name: derivedName,
+          department: 'STAFF',
+          activity: r.activity || 'Staff Member',
+          label: `${derivedName} (STAFF)`,
+          isNew: false,
+          role: 'staff',
+          isFirstLogin: false,
+        });
+      }
+    }
+  });
+
+  // 3. Auto-recover lead departments from YTD tasks
+  (tasks || []).forEach((t) => {
+    if (t && t.lead) {
+      const leadName = t.lead.trim();
+      if (leadName) {
+        const match = Array.from(staffMap.values()).find(
+          (s) => s.name.toLowerCase() === leadName.toLowerCase()
+        );
+        if (match && t.department && match.department === 'STAFF') {
+          match.department = t.department;
+          match.label = `${match.name} (${t.department})`;
+        }
+      }
+    }
+  });
+
+  return ensureStaffDefaults(Array.from(staffMap.values()));
+}
+
 export async function fetchWorkbook() {
   const workbook = await runWithFallback(
     async () => {
@@ -170,11 +227,6 @@ export async function fetchWorkbook() {
         readCollection<StaffMember>('staff'),
         readCollection<MonthProgress>('progress_reports'),
       ]);
-
-      // If Supabase staff collection is empty, trigger fallback to Google Sheets database!
-      if (!staff || staff.length <= 1) {
-        throw new Error('Supabase staff collection is empty. Falling back to Google Sheets database.');
-      }
 
       const recalculatedTasks = ytdTasks.map((task) => ({
         ...task,
@@ -185,9 +237,15 @@ export async function fetchWorkbook() {
     () => googleSheets.fetchWorkbook()
   );
 
+  const fullStaff = recoverStaffFromReportsAndTasks(
+    workbook.staff,
+    workbook.progressReports,
+    workbook.ytdTasks
+  );
+
   return {
     ...workbook,
-    staff: ensureStaffDefaults(workbook.staff),
+    staff: fullStaff,
   };
 }
 
