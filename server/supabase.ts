@@ -82,11 +82,19 @@ function clean<T>(value: T): T {
 async function readCollection<T>(tableName: string): Promise<T[]> {
   const { data, error } = await getSupabaseClient()
     .from(tableName)
-    .select('data');
+    .select('*');
   if (error) {
     throw new Error(`Supabase error reading from "${tableName}": ${error.message}`);
   }
-  return (data || []).map((row: any) => row.data as T);
+  return (data || [])
+    .map((row: any) => {
+      if (!row) return null;
+      if (row.data && typeof row.data === 'object') {
+        return { ...row, ...row.data } as T;
+      }
+      return row as T;
+    })
+    .filter(Boolean) as T[];
 }
 
 async function replaceCollection<T>(
