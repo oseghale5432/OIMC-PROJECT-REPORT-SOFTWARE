@@ -228,6 +228,25 @@ export async function fetchWorkbook() {
         readCollection<MonthProgress>('progress_reports'),
       ]);
 
+      // If Supabase staff list has only Super Admin (length <= 1), pull from Google Sheets database backup!
+      if (!staff || staff.length <= 1) {
+        try {
+          const sheetsWb = await googleSheets.fetchWorkbook();
+          if (sheetsWb && Array.isArray(sheetsWb.staff) && sheetsWb.staff.length > 1) {
+            console.log(`Restoring ${sheetsWb.staff.length} staff profiles from Google Sheets backup into Supabase...`);
+            // Automatically populate restored staff back into Supabase database table!
+            saveStaffProfiles(sheetsWb.staff).catch((e) => console.error('Failed to sync restored staff to Supabase:', e));
+            return {
+              ytdTasks: ytdTasks.length > 0 ? ytdTasks : sheetsWb.ytdTasks,
+              staff: sheetsWb.staff,
+              progressReports: progressReports.length > 0 ? progressReports : sheetsWb.progressReports,
+            };
+          }
+        } catch (sheetsErr) {
+          console.warn('Could not read Google Sheets fallback:', sheetsErr);
+        }
+      }
+
       const recalculatedTasks = ytdTasks.map((task) => ({
         ...task,
         daysRemaining: googleSheets.calculateDaysRemaining(task.dueDate),
