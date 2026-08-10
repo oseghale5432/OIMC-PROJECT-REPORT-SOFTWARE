@@ -102,36 +102,13 @@ async function replaceCollection<T>(
   values: T[],
   idFor: (value: T) => string
 ) {
-  const incomingIds = values.map(idFor);
   const supabase = getSupabaseClient();
 
-  // 1. Fetch existing record IDs from Supabase table
-  const { data: existingRows, error: fetchError } = await supabase
-    .from(tableName)
-    .select('id');
-  if (fetchError) throw fetchError;
-
-  const existingIds = (existingRows || []).map((row: any) => String(row.id));
-  const incomingIdSet = new Set(incomingIds.map((id) => String(id)));
-  const idsToDelete = existingIds.filter((id) => !incomingIdSet.has(id));
-
-  // 2. Delete any records in Supabase whose ID is no longer present in incoming values
-  if (idsToDelete.length > 0) {
-    for (let i = 0; i < idsToDelete.length; i += 100) {
-      const batch = idsToDelete.slice(i, i + 100);
-      const { error: deleteError } = await supabase
-        .from(tableName)
-        .delete()
-        .in('id', batch);
-      if (deleteError) throw deleteError;
-    }
-  }
-
-  // 3. Upsert incoming records
   if (values.length > 0) {
     const payloads = values.map((val) => ({
       id: idFor(val),
       data: clean(val),
+      ...clean(val),
     }));
 
     for (let i = 0; i < payloads.length; i += 100) {
@@ -139,7 +116,10 @@ async function replaceCollection<T>(
       const { error: upsertError } = await supabase
         .from(tableName)
         .upsert(chunk);
-      if (upsertError) throw upsertError;
+      if (upsertError) {
+        console.error(`Supabase upsert error on "${tableName}":`, upsertError);
+        throw upsertError;
+      }
     }
   }
 }
@@ -190,6 +170,12 @@ export async function fetchWorkbook() {
         readCollection<StaffMember>('staff'),
         readCollection<MonthProgress>('progress_reports'),
       ]);
+
+      // If Supabase staff collection is empty, trigger fallback to Google Sheets database!
+      if (!staff || staff.length <= 1) {
+        throw new Error('Supabase staff collection is empty. Falling back to Google Sheets database.');
+      }
+
       const recalculatedTasks = ytdTasks.map((task) => ({
         ...task,
         daysRemaining: googleSheets.calculateDaysRemaining(task.dueDate),
