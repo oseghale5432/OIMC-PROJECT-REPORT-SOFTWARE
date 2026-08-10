@@ -4,11 +4,11 @@
  */
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { 
-  Database, 
-  ExternalLink, 
-  HelpCircle, 
-  RefreshCw, 
+import {
+  Database,
+  ExternalLink,
+  HelpCircle,
+  RefreshCw,
   AlertCircle,
   CheckCircle,
   FileSpreadsheet,
@@ -26,12 +26,13 @@ import {
   EyeOff
 } from 'lucide-react';
 import { YTDTask, StaffMember, MonthProgress, SpreadsheetConfig, PaymentRequest, PaymentStatus, AppNotification } from './types';
-import { 
-  DEFAULT_STAFF, 
-  DEFAULT_YTD_TASKS, 
+import {
+  DEFAULT_STAFF,
+  DEFAULT_YTD_TASKS,
   generateDefaultProgressReports,
   MONTHS,
-  getCurrentLagosMonth
+  getCurrentLagosMonth,
+  autoCarryOverYTDTasks
 } from './data/mockData';
 import Header from './components/Header';
 import YTDPage from './components/YTDPage';
@@ -85,7 +86,7 @@ export default function App() {
   });
   const [authError, setAuthError] = useState<string | null>(null);
   const [isInIframe, setIsInIframe] = useState(false);
-  
+
   // Custom login forms and credentials states
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -93,7 +94,7 @@ export default function App() {
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetName, setResetName] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
-  
+
   // First-Time Password Setup States
   const [isFirstLoginMode, setIsFirstLoginMode] = useState(false);
   const [firstLoginStaff, setFirstLoginStaff] = useState<StaffMember | null>(null);
@@ -140,7 +141,9 @@ export default function App() {
   // App Data States - Load from localStorage if present, else fallback to empty/defaults
   const [tasks, setTasks] = useState<YTDTask[]>(() => {
     const saved = localStorage.getItem('oi_tasks');
-    return saved ? JSON.parse(saved) : DEFAULT_YTD_TASKS;
+    const initialTasks: YTDTask[] = saved ? JSON.parse(saved) : DEFAULT_YTD_TASKS;
+    const { updatedTasks } = autoCarryOverYTDTasks(initialTasks);
+    return updatedTasks;
   });
   const [staffList, setStaffList] = useState<StaffMember[]>(() => {
     const saved = localStorage.getItem('oi_staff_list');
@@ -179,6 +182,12 @@ export default function App() {
       localStorage.removeItem('oi_current_user');
     }
   }, [currentUser]);
+
+  // Keep tasks synced to localStorage and auto-carryover uncompleted tasks
+  useEffect(() => {
+    if (!tasks) return;
+    localStorage.setItem('oi_tasks', JSON.stringify(tasks));
+  }, [tasks]);
   const [progressReports, setProgressReports] = useState<MonthProgress[]>(() => {
     const saved = localStorage.getItem('oi_progress_reports');
     return saved ? JSON.parse(saved) : generateDefaultProgressReports();
@@ -201,8 +210,8 @@ export default function App() {
   const [departments, setDepartments] = useState<string[]>(() => {
     const saved = localStorage.getItem('oi_departments');
     return saved ? JSON.parse(saved) : [
-      'PROJECTS', 'FACILITIES', 'DEVELOPMENT', 'ELECTRICAL', 
-      'HSE / PROCUREMENT', 'SECURITY', 'GARDENING', 'ADMIN', 
+      'PROJECTS', 'FACILITIES', 'DEVELOPMENT', 'ELECTRICAL',
+      'HSE / PROCUREMENT', 'SECURITY', 'GARDENING', 'ADMIN',
       'MANAGEMENT', 'ICT'
     ];
   });
@@ -210,7 +219,7 @@ export default function App() {
   const [statuses, setStatuses] = useState<string[]>(() => {
     const saved = localStorage.getItem('oi_statuses');
     return saved ? JSON.parse(saved) : [
-      'Not Started', 'Work commenced', 'Waiting Approval OIDC SC', 
+      'Not Started', 'Work commenced', 'Waiting Approval OIDC SC',
       'Waiting Approval by GM', 'Completed', 'Pending'
     ];
   });
@@ -280,14 +289,16 @@ export default function App() {
   });
 
   const applyServerWorkbook = (workbook: WorkbookPayload) => {
-    setTasks(workbook.ytdTasks || []);
+    const rawTasks = workbook.ytdTasks || [];
+    const { updatedTasks } = autoCarryOverYTDTasks(rawTasks);
+    setTasks(updatedTasks);
     setStaffList((workbook.staff || []).map((staff) => (
       staff.email?.toLowerCase() === 'oseghale5432@gmail.com'
         ? {
-            ...staff,
-            name: staff.name === 'Admin Boss' ? 'Super Admin' : staff.name || 'Super Admin',
-            label: !staff.label || staff.label.includes('Admin Boss') ? 'Super Admin' : staff.label,
-          }
+          ...staff,
+          name: staff.name === 'Admin Boss' ? 'Super Admin' : staff.name || 'Super Admin',
+          label: !staff.label || staff.label.includes('Admin Boss') ? 'Super Admin' : staff.label,
+        }
         : staff
     )));
     setProgressReports(workbook.progressReports || []);
@@ -352,7 +363,7 @@ export default function App() {
       const email = currentUser.email?.toLowerCase() || '';
       const userProfile = staffList.find(s => s.email?.toLowerCase() === email);
       const isUserAdmin = email === 'oseghale5432@gmail.com' || userProfile?.role === 'admin';
-      
+
       if (!isUserAdmin && isRegisteredStaff) {
         handleSimulateEmailChange(currentUser.email || '');
       }
@@ -378,9 +389,9 @@ export default function App() {
   useEffect(() => {
     if (!currentUser || currentTab !== 'ytd') return;
 
-    refreshServerWorkbook({ silent: true }).catch(() => {});
+    refreshServerWorkbook({ silent: true }).catch(() => { });
     const timer = window.setInterval(() => {
-      refreshServerWorkbook({ silent: true }).catch(() => {});
+      refreshServerWorkbook({ silent: true }).catch(() => { });
     }, 300000);
 
     return () => window.clearInterval(timer);
@@ -399,7 +410,7 @@ export default function App() {
     refreshPayments()
       .then(() => setPaymentError(null))
       .catch((err) => setPaymentError(err.message || 'Could not load payments.'));
-    const timer = window.setInterval(() => refreshPayments().catch(() => {}), 300000);
+    const timer = window.setInterval(() => refreshPayments().catch(() => { }), 300000);
     return () => window.clearInterval(timer);
   }, [currentUser, currentTab, refreshPayments]);
 
@@ -414,15 +425,15 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    refreshNotifications().catch(() => {});
+    refreshNotifications().catch(() => { });
     // Poll for notifications every 30 seconds for quick updates
-    const timer = window.setInterval(() => refreshNotifications().catch(() => {}), 30000);
+    const timer = window.setInterval(() => refreshNotifications().catch(() => { }), 30000);
     return () => window.clearInterval(timer);
   }, [currentUser, refreshNotifications]);
 
   useEffect(() => {
     if (!currentUser || currentTab !== 'notifications') return;
-    refreshNotifications().catch(() => {});
+    refreshNotifications().catch(() => { });
   }, [currentUser, currentTab, refreshNotifications]);
 
   const handleSubmitPayment = async (
@@ -436,7 +447,7 @@ export default function App() {
       setCanApproveGM(result.canApproveGM);
       setCanApproveCOO(result.canApproveCOO);
       setCanCompletePayments(result.canComplete);
-      refreshNotifications().catch(() => {});
+      refreshNotifications().catch(() => { });
     } catch (err: any) {
       setPaymentError(err.message || 'Could not submit payment request.');
       throw err;
@@ -454,7 +465,7 @@ export default function App() {
       setCanApproveGM(result.canApproveGM);
       setCanApproveCOO(result.canApproveCOO);
       setCanCompletePayments(result.canComplete);
-      refreshNotifications().catch(() => {});
+      refreshNotifications().catch(() => { });
     } catch (err: any) {
       setPaymentError(err.message || 'Could not update payment status.');
     } finally {
@@ -637,11 +648,11 @@ export default function App() {
       const workbook = updatedReports
         ? await ApiClient.saveProgress(simulatedEmail, updatedReports, updatedTasks)
         : updatedTasks
-        ? await ApiClient.saveYTDTasks(updatedTasks)
-        : null;
+          ? await ApiClient.saveYTDTasks(updatedTasks)
+          : null;
 
       if (workbook) applyServerWorkbook(workbook);
-      
+
       setSheetsConfig((prev) => ({
         ...prev,
         isSynced: true,
@@ -830,7 +841,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     if (pushToken) {
-      ApiClient.registerPushToken(pushToken).catch(() => {});
+      ApiClient.registerPushToken(pushToken).catch(() => { });
       return;
     }
     registerNotifications();
@@ -869,7 +880,7 @@ export default function App() {
         'Please update your progress in the app as you complete your tasks.'
       );
       alert(`Reminder sent to ${result.delivered} staff.`);
-      refreshNotifications().catch(() => {});
+      refreshNotifications().catch(() => { });
     } catch (error: any) {
       alert(`Failed to send reminder: ${error.message || String(error)}`);
     }
@@ -891,7 +902,7 @@ export default function App() {
         {/* Subtle background decoration */}
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,rgba(249,115,22,0.15),transparent_50%)] pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_bottom_left,rgba(30,41,59,0.5),transparent_50%)] pointer-events-none" />
-        
+
         <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 space-y-6 animate-fade-in">
           <div className="text-center space-y-3">
             <img
@@ -933,19 +944,19 @@ export default function App() {
                   <span>New Custom Password</span>
                 </label>
                 <div className="relative">
-                <input
-                  type={showNewFirstPassword ? 'text' : 'password'}
-                  required
-                  placeholder="At least 6 characters"
-                  value={newFirstPassword}
-                  onChange={(e) => setNewFirstPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
-                />
-                <button type="button" onClick={() => setShowNewFirstPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
-                  aria-label={showNewFirstPassword ? 'Hide password' : 'Show password'}>
-                  {showNewFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  <input
+                    type={showNewFirstPassword ? 'text' : 'password'}
+                    required
+                    placeholder="At least 6 characters"
+                    value={newFirstPassword}
+                    onChange={(e) => setNewFirstPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  />
+                  <button type="button" onClick={() => setShowNewFirstPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                    aria-label={showNewFirstPassword ? 'Hide password' : 'Show password'}>
+                    {showNewFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -955,19 +966,19 @@ export default function App() {
                   <span>Confirm Custom Password</span>
                 </label>
                 <div className="relative">
-                <input
-                  type={showConfirmFirstPassword ? 'text' : 'password'}
-                  required
-                  placeholder="Repeat your password"
-                  value={confirmFirstPassword}
-                  onChange={(e) => setConfirmFirstPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
-                />
-                <button type="button" onClick={() => setShowConfirmFirstPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
-                  aria-label={showConfirmFirstPassword ? 'Hide password' : 'Show password'}>
-                  {showConfirmFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  <input
+                    type={showConfirmFirstPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Repeat your password"
+                    value={confirmFirstPassword}
+                    onChange={(e) => setConfirmFirstPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  />
+                  <button type="button" onClick={() => setShowConfirmFirstPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                    aria-label={showConfirmFirstPassword ? 'Hide password' : 'Show password'}>
+                    {showConfirmFirstPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -1050,19 +1061,19 @@ export default function App() {
                   <span>New Secure Password</span>
                 </label>
                 <div className="relative">
-                <input
-                  type={showResetPassword ? 'text' : 'password'}
-                  required
-                  placeholder="At least 6 characters"
-                  value={resetNewPassword}
-                  onChange={(e) => setResetNewPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
-                />
-                <button type="button" onClick={() => setShowResetPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
-                  aria-label={showResetPassword ? 'Hide password' : 'Show password'}>
-                  {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    required
+                    placeholder="At least 6 characters"
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  />
+                  <button type="button" onClick={() => setShowResetPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                    aria-label={showResetPassword ? 'Hide password' : 'Show password'}>
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -1131,19 +1142,19 @@ export default function App() {
                   </button>
                 </div>
                 <div className="relative">
-                <input
-                  type={showLoginPassword ? 'text' : 'password'}
-                  required
-                  placeholder="••••••••"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
-                />
-                <button type="button" onClick={() => setShowLoginPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
-                  aria-label={showLoginPassword ? 'Hide password' : 'Show password'}>
-                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-orange-500 rounded-xl px-4 py-3 pr-12 text-sm text-slate-100 placeholder-slate-650 focus:outline-none transition-colors font-mono"
+                  />
+                  <button type="button" onClick={() => setShowLoginPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-4 text-slate-500 hover:text-orange-400"
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}>
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -1233,7 +1244,7 @@ export default function App() {
         staffList={staffList}
         currentTab={currentTab}
         onTabChange={handleTabChange}
-        onLogin={() => {}}
+        onLogin={() => { }}
         onLogout={handleLogout}
         isSheetsLinked={sheetsConfig.spreadsheetId !== null}
         onLinkSheets={handleLinkSheets}
@@ -1346,7 +1357,7 @@ export default function App() {
             </div>
           </div>
         )}
-        
+
         {/* Drive & Sheet Sync Status banner */}
         {currentUser && isActualAdmin && !sheetsConfig.spreadsheetId && (
           <div className="bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl p-6 text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
@@ -1400,6 +1411,7 @@ export default function App() {
 
           {currentTab === 'overview' && (
             <OverviewPage
+              tasks={tasks}
               staffList={staffList}
               progressReports={progressReports}
               selectedMonth={selectedMonth}

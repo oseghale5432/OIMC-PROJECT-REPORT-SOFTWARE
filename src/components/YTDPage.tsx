@@ -20,6 +20,7 @@ import {
   Clock
 } from 'lucide-react';
 import { StaffMember, YTDTask } from '../types';
+import { getCurrentLagosMonth, getTaskStartMonth, isTaskCompleted } from '../data/mockData';
 
 interface YTDPageProps {
   tasks: YTDTask[];
@@ -75,13 +76,13 @@ export default function YTDPage({
 
   // Filtered tasks
   const filteredTasks = tasks.filter((task) => {
-    const isCompleted = task.status.toLowerCase().includes('complete') || task.status.toLowerCase().includes('done') || !!task.completedMonth;
+    const isCompleted = isTaskCompleted(task);
 
     const matchesSearch = 
-      task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.lead.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.coWorker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.contractorHead.toLowerCase().includes(searchTerm.toLowerCase());
+      (task.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.lead || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.coWorker || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.contractorHead || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDept = deptFilter === 'ALL' || task.department === deptFilter;
     
@@ -89,14 +90,16 @@ export default function YTDPage({
     if (statusFilter === 'COMPLETED') {
       matchesStatus = isCompleted;
     } else if (statusFilter === 'IN_PROGRESS') {
-      matchesStatus = task.status !== '' && !isCompleted;
+      matchesStatus = (task.status || '') !== '' && !isCompleted;
     } else if (statusFilter === 'NOT_STARTED') {
-      matchesStatus = task.status === '' && !isCompleted;
+      matchesStatus = (task.status || '') === '' && !isCompleted;
     }
 
     let matchesViewMode = true;
     if (viewMode === 'ACTIVE') {
-      matchesViewMode = !isCompleted;
+      const currentMonth = getCurrentLagosMonth();
+      const taskMonth = getTaskStartMonth(task);
+      matchesViewMode = !isCompleted && taskMonth === currentMonth;
     } else if (viewMode === 'COMPLETED') {
       matchesViewMode = isCompleted;
     }
@@ -110,7 +113,12 @@ export default function YTDPage({
       alert('Task description and Managed/Lead are required.');
       return;
     }
-    onAddTask(newTask);
+    const isCompleted = newTask.status.toLowerCase().includes('complete') || newTask.status.toLowerCase() === 'done';
+    onAddTask({
+      ...newTask,
+      completedMonth: isCompleted ? getCurrentLagosMonth() : undefined,
+      completedAt: isCompleted ? new Date().toISOString() : undefined,
+    });
     setNewTask({
       department: 'ADMIN',
       lead: '',
@@ -139,9 +147,15 @@ export default function YTDPage({
       const diffTime = due.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+      const isCompleted = editingTask.status.toLowerCase().includes('complete') || editingTask.status.toLowerCase() === 'done';
+      const updatedCompletedMonth = isCompleted ? (editingTask.completedMonth || getCurrentLagosMonth()) : undefined;
+      const updatedCompletedAt = isCompleted ? (editingTask.completedAt || new Date().toISOString()) : undefined;
+
       onUpdateTask({
         ...editingTask,
         daysRemaining: diffDays,
+        completedMonth: updatedCompletedMonth,
+        completedAt: updatedCompletedAt,
       });
       setEditingId(null);
       setEditingTask(null);
@@ -556,7 +570,7 @@ export default function YTDPage({
                             className="p-1 border rounded bg-white text-xs"
                           />
                         ) : (
-                          task.startDate ? new Date(task.startDate).toLocaleDateString() : '-'
+                          task.startDate || '-'
                         )}
                       </td>
 
@@ -570,7 +584,7 @@ export default function YTDPage({
                             className="p-1 border rounded bg-white text-xs"
                           />
                         ) : (
-                          task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'
+                          task.dueDate || '-'
                         )}
                       </td>
 
@@ -607,9 +621,9 @@ export default function YTDPage({
                             </span>
                           ) : task.status ? (
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                              task.status.toLowerCase().includes('commenced') || task.status.toLowerCase().includes('progress')
+                              (task.status || '').toLowerCase().includes('commenced') || (task.status || '').toLowerCase().includes('progress')
                                 ? 'bg-sky-50 text-sky-700 border border-sky-150'
-                                : task.status.toLowerCase().includes('waiting') || task.status.toLowerCase().includes('hold')
+                                : (task.status || '').toLowerCase().includes('waiting') || (task.status || '').toLowerCase().includes('hold')
                                 ? 'bg-amber-50 text-amber-700 border border-amber-150'
                                 : 'bg-emerald-50 text-emerald-700 border border-emerald-150'
                             }`}>

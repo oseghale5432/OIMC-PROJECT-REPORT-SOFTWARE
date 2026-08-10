@@ -4,13 +4,13 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  FileSpreadsheet, 
-  LayoutDashboard, 
-  User, 
-  LogOut, 
-  Shield, 
-  RefreshCw, 
+import {
+  FileSpreadsheet,
+  LayoutDashboard,
+  User,
+  LogOut,
+  Shield,
+  RefreshCw,
   ChevronDown,
   Database,
   CheckCircle,
@@ -89,11 +89,10 @@ export default function Header({
             <button
               id="tab-ytd"
               onClick={() => handleTabClick('ytd')}
-              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                currentTab === 'ytd'
-                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${currentTab === 'ytd'
+                ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>2026 YTD TASKS</span>
@@ -102,11 +101,10 @@ export default function Header({
             <button
               id="tab-overview"
               onClick={() => handleTabClick('overview')}
-              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                currentTab === 'overview'
-                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${currentTab === 'overview'
+                ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <LayoutDashboard className="w-4 h-4" />
               <span>OVERVIEW</span>
@@ -127,9 +125,8 @@ export default function Header({
             <button
               id="tab-payment"
               onClick={() => handleTabClick('payment')}
-              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <Banknote className="w-4 h-4" /><span>PAYMENT</span>
             </button>
@@ -137,11 +134,10 @@ export default function Header({
             <button
               id="tab-notifications"
               onClick={() => handleTabClick('notifications')}
-              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 relative ${
-                currentTab === 'notifications'
-                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 relative ${currentTab === 'notifications'
+                ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <Bell className="w-4 h-4" />
               <span>NOTIFICATIONS</span>
@@ -155,11 +151,10 @@ export default function Header({
             <button
               id="tab-personal"
               onClick={() => handleTabClick('personal')}
-              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                currentTab === 'personal'
-                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
+              className={`px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${currentTab === 'personal'
+                ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
             >
               <User className="w-4 h-4" />
               <span>{isAdmin ? 'STAFF SHEETS' : 'MY PROGRESS REPORT'}</span>
@@ -216,16 +211,15 @@ export default function Header({
                     <div className="px-3 py-2 border-b border-slate-700 text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                       Switch Active Persona
                     </div>
-                    
+
                     {/* Super Admin */}
                     <button
                       onClick={() => {
                         onSimulateEmailChange('oseghale5432@gmail.com');
                         setShowSimMenu(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-700 transition-colors ${
-                        simulatedEmail === 'oseghale5432@gmail.com' ? 'bg-slate-750 text-orange-400 font-medium' : 'text-slate-300'
-                      }`}
+                      className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-700 transition-colors ${simulatedEmail === 'oseghale5432@gmail.com' ? 'bg-slate-750 text-orange-400 font-medium' : 'text-slate-300'
+                        }`}
                     >
                       <div className="flex items-center space-x-2">
                         <Shield className="w-3.5 h-3.5 text-orange-400" />
@@ -246,9 +240,8 @@ export default function Header({
                           onSimulateEmailChange(staff.email);
                           setShowSimMenu(false);
                         }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-700 transition-colors ${
-                          simulatedEmail === staff.email ? 'bg-slate-750 text-orange-400 font-medium' : 'text-slate-300'
-                        }`}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-slate-700 transition-colors ${simulatedEmail === staff.email ? 'bg-slate-750 text-orange-400 font-medium' : 'text-slate-300'
+                          }`}
                       >
                         <div className="flex flex-col">
                           <span className="font-medium">{staff.name}</span>
@@ -308,9 +301,8 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => handleTabClick('payment')}
-                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                  currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                }`}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${currentTab === 'payment' ? 'bg-slate-800 text-orange-400 border border-slate-700' : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
               >
                 <span className="flex items-center space-x-2"><Banknote className="w-4 h-4" /><span>Payment</span></span>
                 {currentTab === 'payment' && <CheckCircle className="w-4 h-4" />}
@@ -319,11 +311,10 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => handleTabClick('notifications')}
-                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                  currentTab === 'notifications'
-                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                }`}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${currentTab === 'notifications'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
               >
                 <span className="flex items-center space-x-2 relative">
                   <Bell className="w-4 h-4" />
@@ -340,11 +331,10 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => handleTabClick('ytd')}
-                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                  currentTab === 'ytd'
-                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                }`}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${currentTab === 'ytd'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
               >
                 <span className="flex items-center space-x-2">
                   <FileSpreadsheet className="w-4 h-4" />
@@ -356,11 +346,10 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => handleTabClick('overview')}
-                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                  currentTab === 'overview'
-                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                }`}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${currentTab === 'overview'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
               >
                 <span className="flex items-center space-x-2">
                   <LayoutDashboard className="w-4 h-4" />
@@ -372,11 +361,10 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => handleTabClick('personal')}
-                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${
-                  currentTab === 'personal'
-                    ? 'bg-slate-800 text-orange-400 border border-slate-700'
-                    : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
-                }`}
+                className={`w-full px-3 py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-between ${currentTab === 'personal'
+                  ? 'bg-slate-800 text-orange-400 border border-slate-700'
+                  : 'text-slate-300 bg-slate-850/60 border border-slate-800 hover:bg-slate-800'
+                  }`}
               >
                 <span className="flex items-center space-x-2">
                   <User className="w-4 h-4" />

@@ -32,12 +32,15 @@ import {
   UserPlus,
   XCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Briefcase,
+  ArrowUpRight
 } from 'lucide-react';
-import { StaffMember, MonthProgress } from '../types';
-import { MONTHS } from '../data/mockData';
+import { StaffMember, MonthProgress, YTDTask } from '../types';
+import { MONTHS, getTaskStartMonth, isTaskCompleted } from '../data/mockData';
 
 interface OverviewPageProps {
+  tasks?: YTDTask[];
   staffList: StaffMember[];
   progressReports: MonthProgress[];
   selectedMonth: string;
@@ -58,6 +61,7 @@ interface OverviewPageProps {
 }
 
 export default function OverviewPage({
+  tasks = [],
   staffList,
   progressReports,
   selectedMonth,
@@ -82,6 +86,41 @@ export default function OverviewPage({
   // Staff search state
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Filter tasks for selected month
+  const selectedMonthLower = (selectedMonth || '').toLowerCase();
+
+  const completedForMonth = tasks.filter((t) => {
+    if (!t) return false;
+    const completed = isTaskCompleted(t);
+    if (!completed) return false;
+    const compMonth = (t.completedMonth || getTaskStartMonth(t) || '').toLowerCase();
+    return compMonth === selectedMonthLower;
+  });
+
+  const activeForMonth = tasks.filter((t) => {
+    if (!t) return false;
+    const completed = isTaskCompleted(t);
+    if (completed) return false;
+    const startMonth = (getTaskStartMonth(t) || '').toLowerCase();
+    const carriedFrom = (t.carriedOverFrom || '').toLowerCase();
+    return startMonth === selectedMonthLower || carriedFrom === selectedMonthLower;
+  });
+
+  const carriedForMonth = tasks.filter((t) => {
+    if (!t) return false;
+    const carriedFrom = (t.carriedOverFrom || '').toLowerCase();
+    const startMonth = (getTaskStartMonth(t) || '').toLowerCase();
+    return carriedFrom === selectedMonthLower || (startMonth === selectedMonthLower && !!t.carriedOverFrom);
+  });
+
+  const monthTasks = tasks.filter((t) => {
+    if (!t) return false;
+    const startMonth = (getTaskStartMonth(t) || '').toLowerCase();
+    const compMonth = (t.completedMonth || '').toLowerCase();
+    const carriedFrom = (t.carriedOverFrom || '').toLowerCase();
+    return startMonth === selectedMonthLower || compMonth === selectedMonthLower || carriedFrom === selectedMonthLower;
+  });
 
   // New staff form fields
   const [newEmail, setNewEmail] = useState('');
@@ -540,6 +579,191 @@ export default function OverviewPage({
               <div className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-600" /> = TASK COMPLETED</div>
               <div className="flex items-center gap-1"><XCircle className="w-3 h-3 text-red-600" /> = TASK NOT COMPLETED / PENDING</div>
               <div>Empty/Gray = NO ASSIGNED TASK FOR THIS PERIOD</div>
+            </div>
+          </div>
+
+          {/* WORK PROJECTS TRACKER SECTION FOR SELECTED MONTH */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden space-y-4 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 font-bold">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-sans font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                    <span>WORK PROJECTS TRACKER - {selectedMonth.toUpperCase()} 2026</span>
+                    <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-mono">
+                      {monthTasks.length} {monthTasks.length === 1 ? 'Project' : 'Projects'}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Overview of active, completed, and carried-over corporate work projects for {selectedMonth}.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Projects Bento Stats for Selected Month */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Completed in {selectedMonth}</span>
+                  <div className="text-2xl font-extrabold text-emerald-800 font-mono">{completedForMonth.length}</div>
+                  <p className="text-[10px] text-emerald-600 font-medium">Recorded finished projects</p>
+                </div>
+                <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-lg flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-orange-50/60 p-3.5 rounded-xl border border-orange-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider block">Active in {selectedMonth}</span>
+                  <div className="text-2xl font-extrabold text-orange-800 font-mono">{activeForMonth.length}</div>
+                  <p className="text-[10px] text-orange-600 font-medium">Work projects currently in progress</p>
+                </div>
+                <div className="w-10 h-10 bg-orange-100 text-orange-700 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wider block">Carried Over Tasks</span>
+                  <div className="text-2xl font-extrabold text-sky-800 font-mono">{carriedForMonth.length}</div>
+                  <p className="text-[10px] text-sky-600 font-medium">Carried forward across months</p>
+                </div>
+                <div className="w-10 h-10 bg-sky-100 text-sky-700 rounded-lg flex items-center justify-center">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION A: COMPLETED WORK PROJECTS IN SELECTED MONTH */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center space-x-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Completed Work Projects ({completedForMonth.length})</span>
+              </div>
+
+              {completedForMonth.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                  No completed work projects logged under {selectedMonth} 2026.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs text-slate-700 min-w-[750px]">
+                    <thead>
+                      <tr className="bg-emerald-900 text-white font-bold uppercase text-[10px]">
+                        <th className="py-2.5 px-3">Project Description</th>
+                        <th className="py-2.5 px-3">Lead / Manager</th>
+                        <th className="py-2.5 px-3">Department</th>
+                        <th className="py-2.5 px-3">Contractor / Head</th>
+                        <th className="py-2.5 px-3">Completion Log</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-emerald-50/10">
+                      {completedForMonth.map((task) => (
+                        <tr key={task.id} className="hover:bg-emerald-50/30 transition-colors">
+                          <td className="p-3 font-semibold text-slate-800 max-w-xs">{task.description}</td>
+                          <td className="p-3 font-medium text-slate-700">
+                            {task.lead} {task.coWorker ? <span className="text-slate-400 text-[10px]">({task.coWorker})</span> : ''}
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold uppercase">
+                              {task.department}
+                            </span>
+                          </td>
+                          <td className="p-3 font-medium text-slate-600">{task.contractorHead || '-'}</td>
+                          <td className="p-3 text-[11px] font-mono text-emerald-700 font-semibold">
+                            Completed in {task.completedMonth || selectedMonth}
+                          </td>
+                          <td className="p-3">
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[9px] uppercase rounded-full">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>{task.status || 'Completed'}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* SECTION B: ACTIVE & CARRIED OVER WORK PROJECTS */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center space-x-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                <Clock className="w-4 h-4 text-orange-500" />
+                <span>Active & Carried-Over Work Projects ({activeForMonth.length})</span>
+              </div>
+
+              {activeForMonth.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+                  No active work projects assigned for {selectedMonth} 2026.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs text-slate-700 min-w-[850px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-white font-bold uppercase text-[10px]">
+                        <th className="py-2.5 px-3">Project Description</th>
+                        <th className="py-2.5 px-3">Lead / Manager</th>
+                        <th className="py-2.5 px-3">Department</th>
+                        <th className="py-2.5 px-3">Contractor / Head</th>
+                        <th className="py-2.5 px-3">Start & Due Date</th>
+                        <th className="py-2.5 px-3">Carryover Details</th>
+                        <th className="py-2.5 px-3">Days Left</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {activeForMonth.map((task) => (
+                        <tr key={task.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-3 font-semibold text-slate-800 max-w-xs">{task.description}</td>
+                          <td className="p-3 font-medium text-slate-700">
+                            {task.lead} {task.coWorker ? <span className="text-slate-400 text-[10px]">({task.coWorker})</span> : ''}
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-mono font-bold uppercase">
+                              {task.department}
+                            </span>
+                          </td>
+                          <td className="p-3 font-medium text-slate-600">{task.contractorHead || '-'}</td>
+                          <td className="p-3 font-mono text-[11px] text-slate-600">
+                            <div>Start: {task.startDate}</div>
+                            <div className="text-slate-400 text-[10px]">Due: {task.dueDate}</div>
+                          </td>
+                          <td className="p-3">
+                            {task.carriedOverFrom ? (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 bg-sky-100 text-sky-800 font-extrabold text-[9px] uppercase rounded-full border border-sky-200">
+                                <ArrowUpRight className="w-3 h-3 text-sky-600" />
+                                <span>Carried over from {task.carriedOverFrom}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px] font-mono">Original {selectedMonth}</span>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono font-bold">
+                            {task.daysRemaining < 0 ? (
+                              <span className="text-red-600 bg-red-50 px-2 py-0.5 rounded text-[10px]">Overdue ({Math.abs(task.daysRemaining)} days)</span>
+                            ) : (
+                              <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[10px]">{task.daysRemaining} days left</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-orange-100 text-orange-800 font-bold text-[9px] uppercase rounded">
+                              {task.status || 'In Progress'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
