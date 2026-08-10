@@ -291,19 +291,43 @@ export default function App() {
   });
 
   const applyServerWorkbook = (workbook: WorkbookPayload) => {
-    const rawTasks = workbook.ytdTasks || [];
-    const { updatedTasks } = autoCarryOverYTDTasks(rawTasks);
-    setTasks(updatedTasks);
-    setStaffList((workbook.staff || []).map((staff) => (
-      staff.email?.toLowerCase() === 'oseghale5432@gmail.com'
-        ? {
-          ...staff,
-          name: staff.name === 'Admin Boss' ? 'Super Admin' : staff.name || 'Super Admin',
-          label: !staff.label || staff.label.includes('Admin Boss') ? 'Super Admin' : staff.label,
-        }
-        : staff
-    )));
-    setProgressReports(workbook.progressReports || []);
+    // 1. Merge YTD Tasks (only overwrite if server returns valid tasks, otherwise preserve local)
+    if (Array.isArray(workbook.ytdTasks) && workbook.ytdTasks.length > 0) {
+      const { updatedTasks } = autoCarryOverYTDTasks(workbook.ytdTasks);
+      setTasks(updatedTasks);
+    }
+
+    // 2. Merge Staff Profiles (never wipe out local staff list if server has empty/fewer staff)
+    if (Array.isArray(workbook.staff) && workbook.staff.length > 0) {
+      setStaffList((prevStaff) => {
+        const staffMap = new Map<string, StaffMember>();
+        prevStaff.forEach((s) => staffMap.set(s.email.toLowerCase(), s));
+        workbook.staff.forEach((s) => {
+          const email = s.email?.toLowerCase();
+          if (email) {
+            const existing = staffMap.get(email);
+            staffMap.set(email, {
+              ...existing,
+              ...s,
+              name: s.name === 'Admin Boss' ? 'Super Admin' : s.name || existing?.name || 'Super Admin',
+              label: !s.label || s.label.includes('Admin Boss') ? 'Super Admin' : s.label,
+            });
+          }
+        });
+        return Array.from(staffMap.values());
+      });
+    }
+
+    // 3. Merge Progress Reports
+    if (Array.isArray(workbook.progressReports) && workbook.progressReports.length > 0) {
+      setProgressReports((prevReports) => {
+        const reportMap = new Map<string, MonthProgress>();
+        prevReports.forEach((r) => reportMap.set(r.id, r));
+        workbook.progressReports.forEach((r) => reportMap.set(r.id, r));
+        return Array.from(reportMap.values());
+      });
+    }
+
     setSheetsConfig((prev) => ({
       ...prev,
       spreadsheetId: workbook.databaseId || prev.spreadsheetId || 'supabase',

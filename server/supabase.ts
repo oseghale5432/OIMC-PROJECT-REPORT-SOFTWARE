@@ -160,7 +160,7 @@ export function ensureStaffDefaults(staffList: StaffMember[]): StaffMember[] {
       isNew: false,
       role: 'admin',
       password: 'admin123',
-      isFirstLogin: true,
+      isFirstLogin: false,
     });
   } else {
     const admin = list[adminIndex];
@@ -168,7 +168,7 @@ export function ensureStaffDefaults(staffList: StaffMember[]): StaffMember[] {
     if (!admin.label || admin.label.includes('Admin Boss')) admin.label = 'Super Admin';
     if (!admin.password) {
       admin.password = 'admin123';
-      admin.isFirstLogin = true;
+      admin.isFirstLogin = false;
     }
   }
   return list;
