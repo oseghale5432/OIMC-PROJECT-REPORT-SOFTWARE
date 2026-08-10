@@ -139,16 +139,18 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // App Data States - Load from localStorage if present, else fallback to empty/defaults
+  // App Data States - Load from localStorage if present, else fallback to defaults
   const [tasks, setTasks] = useState<YTDTask[]>(() => {
     const saved = localStorage.getItem('oi_tasks');
-    const initialTasks: YTDTask[] = saved ? JSON.parse(saved) : DEFAULT_YTD_TASKS;
+    let parsed: YTDTask[] = saved ? JSON.parse(saved) : [];
+    const initialTasks: YTDTask[] = Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_YTD_TASKS;
     const { updatedTasks } = autoCarryOverYTDTasks(initialTasks);
     return updatedTasks;
   });
   const [staffList, setStaffList] = useState<StaffMember[]>(() => {
     const saved = localStorage.getItem('oi_staff_list');
-    let list: StaffMember[] = saved ? JSON.parse(saved) : DEFAULT_STAFF;
+    let parsed: StaffMember[] = saved ? JSON.parse(saved) : [];
+    let list: StaffMember[] = Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_STAFF;
     // Guarantee super admin exists and has a default initial password
     const superAdminIndex = list.findIndex(s => s.email?.toLowerCase() === 'oseghale5432@gmail.com');
     if (superAdminIndex === -1) {

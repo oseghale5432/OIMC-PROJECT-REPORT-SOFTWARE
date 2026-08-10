@@ -13,11 +13,110 @@ export const DEFAULT_STAFF: StaffMember[] = [
     activity: 'SUPER ADMIN', 
     label: 'Super Admin', 
     isNew: false, 
-    role: 'admin' 
+    role: 'admin',
+    password: 'admin123',
+    isFirstLogin: false
+  },
+  {
+    email: 'uwa.projects@orangeisland.ng',
+    name: 'Uwa Enoma',
+    department: 'PROJECTS',
+    activity: 'PROJECTS MANAGER',
+    label: 'Uwa Enoma (PROJECTS)',
+    isNew: false,
+    role: 'staff',
+    password: 'password123',
+    isFirstLogin: false
+  },
+  {
+    email: 'emmanuel.facilities@orangeisland.ng',
+    name: 'Emmanuel Okafor',
+    department: 'FACILITIES',
+    activity: 'FACILITIES LEAD',
+    label: 'Emmanuel Okafor (FACILITIES)',
+    isNew: false,
+    role: 'staff',
+    password: 'password123',
+    isFirstLogin: false
+  },
+  {
+    email: 'kenol.elec@orangeisland.ng',
+    name: 'Kenneth Olamilekan',
+    department: 'ELECTRICAL',
+    activity: 'ELECTRICAL ENGINEER',
+    label: 'Kenneth Olamilekan (ELECTRICAL)',
+    isNew: false,
+    role: 'staff',
+    password: 'password123',
+    isFirstLogin: false
+  },
+  {
+    email: 'tunde.ict@orangeisland.ng',
+    name: 'Tunde Bakare',
+    department: 'ICT',
+    activity: 'ICT & NETWORKING',
+    label: 'Tunde Bakare (ICT)',
+    isNew: false,
+    role: 'staff',
+    password: 'password123',
+    isFirstLogin: false
   }
 ];
 
-export const DEFAULT_YTD_TASKS: YTDTask[] = [];
+export const DEFAULT_YTD_TASKS: YTDTask[] = [
+  {
+    id: 'YTD-101',
+    department: 'PROJECTS',
+    lead: 'Uwa Enoma',
+    coWorker: 'Sunday Danladi',
+    contractorHead: 'BRICK MORTAR STEEL (BMS)',
+    description: 'Structural inspection and road sandfilling monitoring at Phase 2 sector B',
+    startDate: '2026-08-01',
+    dueDate: '2026-08-31',
+    daysRemaining: 21,
+    status: 'Work commenced',
+    remark: 'On track'
+  },
+  {
+    id: 'YTD-102',
+    department: 'FACILITIES',
+    lead: 'Emmanuel Okafor',
+    coWorker: 'Blessing Udoh',
+    contractorHead: 'ROELAG (WWTP)',
+    description: 'Routine maintenance of Wastewater Treatment Plant pumps and blowers',
+    startDate: '2026-08-05',
+    dueDate: '2026-08-25',
+    daysRemaining: 15,
+    status: 'Work commenced',
+    remark: 'Filters replaced'
+  },
+  {
+    id: 'YTD-103',
+    department: 'ELECTRICAL',
+    lead: 'Kenneth Olamilekan',
+    coWorker: 'Femi Adebayo',
+    contractorHead: 'KENOL (NEW METERS)',
+    description: 'Installation of 50 new smart pre-payment electricity meters',
+    startDate: '2026-08-10',
+    dueDate: '2026-08-30',
+    daysRemaining: 20,
+    status: 'Not Started',
+    remark: 'Awaiting shipment dispatch'
+  },
+  {
+    id: 'YTD-104',
+    department: 'ICT',
+    lead: 'Tunde Bakare',
+    coWorker: 'Victor Eze',
+    contractorHead: 'PILGRIMS (CCTV)',
+    description: 'Fiber optic network expansion and perimeter CCTV sensor audit',
+    startDate: '2026-08-02',
+    dueDate: '2026-08-28',
+    daysRemaining: 18,
+    status: 'Work commenced',
+    remark: 'Cable laying in progress'
+  }
+];
 
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -32,7 +131,29 @@ export function getCurrentLagosMonth() {
 }
 
 export const generateDefaultProgressReports = (): MonthProgress[] => {
-  return [];
+  const defaultStaffEmails = [
+    { email: 'uwa.projects@orangeisland.ng', activity: 'PROJECTS MANAGER' },
+    { email: 'emmanuel.facilities@orangeisland.ng', activity: 'FACILITIES LEAD' },
+    { email: 'kenol.elec@orangeisland.ng', activity: 'ELECTRICAL ENGINEER' },
+    { email: 'tunde.ict@orangeisland.ng', activity: 'ICT & NETWORKING' },
+  ];
+
+  const reports: MonthProgress[] = [];
+  MONTHS.forEach((month) => {
+    defaultStaffEmails.forEach((staff) => {
+      reports.push({
+        id: `${staff.email}_${month}`,
+        staffEmail: staff.email,
+        month: month,
+        activity: staff.activity,
+        tasks: Array.from({ length: 15 }, () => ({
+          description: '',
+          completed: null,
+        })),
+      });
+    });
+  });
+  return reports;
 };
 
 export function isTaskCompleted(task: YTDTask): boolean {
