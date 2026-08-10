@@ -113,16 +113,17 @@ async function innerHandler(req: ApiRequest, res: ApiResponse) {
 
     try {
       const body = await readJson(req);
-      const title = String(body.title || 'Please update your progress');
-      const message = String(body.body || 'Update your task progress in the app as you complete work.');
+      const title = String(body.title || 'Notification');
+      const message = String(body.body || 'Notice from Admin');
+      const recipientEmail = String(body.recipientEmail || 'all').trim().toLowerCase();
 
-      const tokens = await getPushTokens();
-      if (!tokens.length) {
-        return sendJson(res, 200, { delivered: 0, message: 'No registered notification tokens were found.' });
-      }
+      const allTokens = await getPushTokens();
+      const targetTokens = (recipientEmail && recipientEmail !== 'all')
+        ? allTokens.filter((t) => t.email.trim().toLowerCase() === recipientEmail)
+        : allTokens;
 
       const results = await Promise.all(
-        tokens.map(async (entry) => {
+        targetTokens.map(async (entry) => {
           try {
             await sendFcmMessage(entry.token, title, message, { email: entry.email });
             return { email: entry.email, status: 'sent' };
@@ -132,13 +133,13 @@ async function innerHandler(req: ApiRequest, res: ApiResponse) {
         })
       );
 
-      // Store in firestore notifications database
+      // Store in notifications database
       await addNotification({
         id: `NOTIF-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`,
         title,
         body: message,
         timestamp: new Date().toISOString(),
-        recipientEmail: 'all',
+        recipientEmail: recipientEmail || 'all',
         type: 'broadcast',
         isRead: false,
       });

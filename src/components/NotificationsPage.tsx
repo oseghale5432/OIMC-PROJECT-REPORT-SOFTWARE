@@ -15,12 +15,16 @@ interface NotificationsPageProps {
   notifications: AppNotification[];
   onMarkRead: (id?: string) => Promise<void>;
   isSaving: boolean;
+  isAdmin?: boolean;
+  onOpenSendModal?: () => void;
 }
 
 export default function NotificationsPage({
   notifications,
   onMarkRead,
   isSaving,
+  isAdmin,
+  onOpenSendModal,
 }: NotificationsPageProps) {
   const [filter, setFilter] = useState<'all' | 'unread' | 'payment' | 'broadcast'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,16 +91,28 @@ export default function NotificationsPage({
               </p>
             </div>
           </div>
-          {unreadCount > 0 && (
-            <button
-              disabled={isSaving}
-              onClick={() => onMarkRead()}
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/10 hover:bg-orange-600 focus:outline-none transition-all disabled:opacity-50"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Mark all as read
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && onOpenSendModal && (
+              <button
+                type="button"
+                onClick={onOpenSendModal}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-700 px-4 py-2.5 text-sm font-bold text-orange-400 hover:bg-slate-750 focus:outline-none transition-all shadow-sm"
+              >
+                <Megaphone className="h-4 w-4 text-orange-400" />
+                Send Notification
+              </button>
+            )}
+            {unreadCount > 0 && (
+              <button
+                disabled={isSaving}
+                onClick={() => onMarkRead()}
+                className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/10 hover:bg-orange-600 focus:outline-none transition-all disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Mark all as read
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

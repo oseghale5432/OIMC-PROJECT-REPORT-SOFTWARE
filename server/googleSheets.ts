@@ -93,6 +93,16 @@ async function updateRange(range: string, values: string[][]) {
   });
 }
 
+async function clearRange(range: string) {
+  try {
+    await sheetsFetch(`/values/${encodeURIComponent(range)}:clear`, {
+      method: 'POST',
+    });
+  } catch (e) {
+    // Ignore clear errors if range is already empty
+  }
+}
+
 async function ensureSheet(title: string) {
   const metadata = await sheetsFetch('?fields=sheets.properties.title');
   const exists = (metadata.sheets || []).some((sheet: any) => sheet.properties?.title === title);
@@ -224,6 +234,7 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
     t.remark,
   ]);
 
+  await clearRange('YTD_Tasks!A2:K10000');
   await updateRange('YTD_Tasks!A1:K', [headers, ...rows]);
 }
 
@@ -252,6 +263,7 @@ export async function saveStaffProfiles(staff: StaffMember[]) {
     s.isFirstLogin === false ? 'FALSE' : 'TRUE',
   ]);
 
+  await clearRange('Staff_Profiles!A2:I10000');
   await updateRange('Staff_Profiles!A1:I', [headers, ...rows]);
 }
 
@@ -279,6 +291,7 @@ export async function saveProgressReports(reports: MonthProgress[]) {
     return row;
   });
 
+  await clearRange('Progress_Reports!A2:AH10000');
   await updateRange('Progress_Reports!A1:AH', [headers, ...rows]);
 }
 

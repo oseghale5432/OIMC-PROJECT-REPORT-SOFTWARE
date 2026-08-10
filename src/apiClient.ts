@@ -131,10 +131,10 @@ export const ApiClient = {
     });
   },
 
-  broadcastNotification(title: string, body: string) {
+  broadcastNotification(title: string, body: string, recipientEmail: string = 'all') {
     return apiFetch<{ delivered: number; results: Array<Record<string, unknown>> }>('/api/notifications', {
       method: 'POST',
-      body: JSON.stringify({ title, body }),
+      body: JSON.stringify({ title, body, recipientEmail }),
       headers: { 'X-Action': 'broadcast' },
     });
   },

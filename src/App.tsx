@@ -40,6 +40,7 @@ import OverviewPage from './components/OverviewPage';
 import StaffProgressPage from './components/StaffProgressPage';
 import PaymentPage from './components/PaymentPage';
 import NotificationsPage from './components/NotificationsPage';
+import SendNotificationModal from './components/SendNotificationModal';
 import { ApiClient, WorkbookPayload } from './apiClient';
 import { requestNotificationPermission, subscribeToPushNotifications, onForegroundMessage } from './firebaseMessaging';
 import { DEFAULT_ACCOUNTING_CODES } from './data/accountingCodes';
@@ -267,6 +268,7 @@ export default function App() {
   // Notifications States
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isSavingNotification, setIsSavingNotification] = useState(false);
+  const [showSendNotificationModal, setShowSendNotificationModal] = useState(false);
 
   const handleSimulateEmailChange = (email: string) => {
     setSimulatedEmail(email);
@@ -873,16 +875,26 @@ export default function App() {
     }
   }, [notifications]);
 
-  const handleBroadcastReminder = async () => {
+  const handleBroadcastReminder = () => {
+    setShowSendNotificationModal(true);
+  };
+
+  const handleSendCustomNotification = async (data: { recipientEmail: string; title: string; body: string }) => {
     try {
       const result = await ApiClient.broadcastNotification(
-        'Update your progress now',
-        'Please update your progress in the app as you complete your tasks.'
+        data.title,
+        data.body,
+        data.recipientEmail
       );
-      alert(`Reminder sent to ${result.delivered} staff.`);
+      const recipientName = data.recipientEmail === 'all'
+        ? 'all registered users'
+        : staffList.find(s => s.email.toLowerCase() === data.recipientEmail.toLowerCase())?.name || data.recipientEmail;
+
+      alert(`Notification sent successfully to ${recipientName}.`);
       refreshNotifications().catch(() => { });
     } catch (error: any) {
-      alert(`Failed to send reminder: ${error.message || String(error)}`);
+      alert(`Failed to send notification: ${error.message || String(error)}`);
+      throw error;
     }
   };
 
@@ -1464,10 +1476,19 @@ export default function App() {
               notifications={notifications}
               onMarkRead={handleMarkNotificationsRead}
               isSaving={isSavingNotification}
+              isAdmin={isAdmin}
+              onOpenSendModal={() => setShowSendNotificationModal(true)}
             />
           )}
         </div>
       </main>
+
+      <SendNotificationModal
+        isOpen={showSendNotificationModal}
+        onClose={() => setShowSendNotificationModal(false)}
+        staffList={staffList}
+        onSend={handleSendCustomNotification}
+      />
 
       {/* Footer copyright info */}
       <footer className="bg-slate-900 border-t border-slate-800 text-slate-500 py-6 text-center text-xs">

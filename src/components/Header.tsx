@@ -115,9 +115,10 @@ export default function Header({
                 type="button"
                 onClick={onBroadcastReminder}
                 className="px-4 py-2 rounded-md font-sans text-sm font-medium transition-all duration-200 flex items-center space-x-2 text-amber-100 bg-amber-600/10 border border-amber-600/25 hover:bg-amber-600/15"
+                title="Send custom notification to team or individual user"
               >
-                <Shield className="w-4 h-4" />
-                <span>Send Reminder</span>
+                <Bell className="w-4 h-4 text-orange-400" />
+                <span>Send Notification</span>
               </button>
             )}
 

@@ -36,10 +36,12 @@ async function runWithBackup(
   sheetsWrite: () => Promise<unknown>
 ): Promise<void> {
   let supabaseSucceeded = false;
+  let supabaseError: any = null;
   try {
     await supabaseWrite();
     supabaseSucceeded = true;
   } catch (error: any) {
+    supabaseError = error;
     console.error('Supabase write operation failed. Writing to Google Sheets backup...', error);
   }
 
@@ -48,8 +50,12 @@ async function runWithBackup(
   } catch (sheetsError) {
     console.error('Google Sheets backup write failed:', sheetsError);
     if (!supabaseSucceeded) {
-      throw sheetsError;
+      throw supabaseError || sheetsError;
     }
+  }
+
+  if (!supabaseSucceeded && supabaseError) {
+    throw supabaseError;
   }
 }
 
@@ -75,23 +81,29 @@ async function replaceCollection<T>(
   const incomingIds = values.map(idFor);
   const supabase = getSupabaseClient();
 
-  // 1. Delete records not in the incoming IDs
-  if (incomingIds.length > 0) {
-    const { error: deleteError } = await supabase
-      .from(tableName)
-      .delete()
-      .not('id', 'in', `(${incomingIds.map(id => `"${id}"`).join(',')})`);
-    if (deleteError) throw deleteError;
-  } else {
-    // If incoming is empty, delete everything
-    const { error: deleteError } = await supabase
-      .from(tableName)
-      .delete()
-      .neq('id', 'placeholder-value-that-does-not-exist');
-    if (deleteError) throw deleteError;
+  // 1. Fetch existing record IDs from Supabase table
+  const { data: existingRows, error: fetchError } = await supabase
+    .from(tableName)
+    .select('id');
+  if (fetchError) throw fetchError;
+
+  const existingIds = (existingRows || []).map((row: any) => String(row.id));
+  const incomingIdSet = new Set(incomingIds.map((id) => String(id)));
+  const idsToDelete = existingIds.filter((id) => !incomingIdSet.has(id));
+
+  // 2. Delete any records in Supabase whose ID is no longer present in incoming values
+  if (idsToDelete.length > 0) {
+    for (let i = 0; i < idsToDelete.length; i += 100) {
+      const batch = idsToDelete.slice(i, i + 100);
+      const { error: deleteError } = await supabase
+        .from(tableName)
+        .delete()
+        .in('id', batch);
+      if (deleteError) throw deleteError;
+    }
   }
 
-  // 2. Upsert incoming records
+  // 3. Upsert incoming records
   if (values.length > 0) {
     const payloads = values.map((val) => ({
       id: idFor(val),
