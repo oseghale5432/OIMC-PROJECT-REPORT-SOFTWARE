@@ -304,12 +304,44 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
 }
 
 export async function saveStaffProfiles(staff: StaffMember[]) {
+  const normalizedStaff = staff.map((member) => ({ ...member, email: member.email.trim().toLowerCase() }));
+  const validEmails = new Set(normalizedStaff.map((s) => s.email));
+
   await runWithBackup(
-    () => replaceCollection(
-      'staff',
-      staff.map((member) => ({ ...member, email: member.email.trim().toLowerCase() })),
-      (member) => member.email
-    ),
+    async () => {
+      const supabase = getSupabaseClient();
+      // 1. Delete removed staff profiles from Supabase 'staff' table
+      const { data: currentRows } = await supabase.from('staff').select('id');
+      if (currentRows && currentRows.length > 0) {
+        const idsToDelete = currentRows
+          .map((r: any) => (r.id || r.email || '').toLowerCase())
+          .filter((id: string) => id && !validEmails.has(id));
+
+        if (idsToDelete.length > 0) {
+          console.log(`Deleting ${idsToDelete.length} removed staff profile(s) from Supabase...`);
+          await supabase.from('staff').delete().in('id', idsToDelete);
+        }
+      }
+
+      // 2. Delete progress reports belonging to removed staff from Supabase 'progress_reports' table
+      const { data: currentReportRows } = await supabase.from('progress_reports').select('id, data');
+      if (currentReportRows && currentReportRows.length > 0) {
+        const reportIdsToDelete = currentReportRows
+          .filter((r: any) => {
+            const staffEmail = (r.data?.staffEmail || r.staffEmail || '').toLowerCase();
+            return staffEmail && !validEmails.has(staffEmail);
+          })
+          .map((r: any) => r.id);
+
+        if (reportIdsToDelete.length > 0) {
+          console.log(`Deleting ${reportIdsToDelete.length} progress report(s) for removed staff from Supabase...`);
+          await supabase.from('progress_reports').delete().in('id', reportIdsToDelete);
+        }
+      }
+
+      // 3. Upsert current valid staff
+      await replaceCollection('staff', normalizedStaff, (member) => member.email);
+    },
     () => googleSheets.saveStaffProfiles(staff)
   );
 }

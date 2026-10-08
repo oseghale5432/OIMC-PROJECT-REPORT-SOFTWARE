@@ -299,35 +299,27 @@ export default function App() {
       setTasks(updatedTasks);
     }
 
-    // 2. Merge Staff Profiles (never wipe out local staff list if server has empty/fewer staff)
+    // 2. Sync Staff Profiles with server payload (respecting removals)
     if (Array.isArray(workbook.staff) && workbook.staff.length > 0) {
       setStaffList((prevStaff) => {
-        const staffMap = new Map<string, StaffMember>();
-        prevStaff.forEach((s) => staffMap.set(s.email.toLowerCase(), s));
-        workbook.staff.forEach((s) => {
+        const prevMap = new Map<string, StaffMember>();
+        prevStaff.forEach((s) => prevMap.set(s.email.toLowerCase(), s));
+        return workbook.staff.map((s) => {
           const email = s.email?.toLowerCase();
-          if (email) {
-            const existing = staffMap.get(email);
-            staffMap.set(email, {
-              ...existing,
-              ...s,
-              name: s.name === 'Admin Boss' ? 'Super Admin' : s.name || existing?.name || 'Super Admin',
-              label: !s.label || s.label.includes('Admin Boss') ? 'Super Admin' : s.label,
-            });
-          }
+          const existing = email ? prevMap.get(email) : undefined;
+          return {
+            ...existing,
+            ...s,
+            name: s.name === 'Admin Boss' ? 'Super Admin' : s.name || existing?.name || 'Super Admin',
+            label: !s.label || s.label.includes('Admin Boss') ? 'Super Admin' : s.label,
+          };
         });
-        return Array.from(staffMap.values());
       });
     }
 
-    // 3. Merge Progress Reports
-    if (Array.isArray(workbook.progressReports) && workbook.progressReports.length > 0) {
-      setProgressReports((prevReports) => {
-        const reportMap = new Map<string, MonthProgress>();
-        prevReports.forEach((r) => reportMap.set(r.id, r));
-        workbook.progressReports.forEach((r) => reportMap.set(r.id, r));
-        return Array.from(reportMap.values());
-      });
+    // 3. Sync Progress Reports with server payload
+    if (Array.isArray(workbook.progressReports)) {
+      setProgressReports(workbook.progressReports);
     }
 
     setSheetsConfig((prev) => ({
@@ -820,11 +812,14 @@ export default function App() {
 
   // Delete staff member and their progress reports
   const handleDeleteStaff = async (email: string) => {
-    const updatedStaffList = staffList.filter(s => s.email !== email);
-    const updatedReports = progressReports.filter(r => r.staffEmail !== email);
+    const targetEmail = email.trim().toLowerCase();
+    const updatedStaffList = staffList.filter(s => s.email.trim().toLowerCase() !== targetEmail);
+    const updatedReports = progressReports.filter(r => r.staffEmail.trim().toLowerCase() !== targetEmail);
 
     setStaffList(updatedStaffList);
     setProgressReports(updatedReports);
+    localStorage.setItem('oi_staff_list', JSON.stringify(updatedStaffList));
+    localStorage.setItem('oi_progress_reports', JSON.stringify(updatedReports));
 
     // Logged-in admins save staff through Supabase.
     if (currentUser) {

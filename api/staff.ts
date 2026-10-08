@@ -42,13 +42,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       };
     });
 
+    const validEmails = new Set(updatedStaff.map((s) => s.email.toLowerCase()));
     await saveStaffProfiles(updatedStaff);
-    if (Array.isArray(body.progressReports)) await saveProgressReports(body.progressReports);
+
+    let finalReports = workbook.progressReports;
+    if (Array.isArray(body.progressReports)) {
+      finalReports = body.progressReports.filter(
+        (r) => r.staffEmail && validEmails.has(r.staffEmail.trim().toLowerCase())
+      );
+      await saveProgressReports(finalReports);
+    } else {
+      finalReports = workbook.progressReports.filter(
+        (r) => r.staffEmail && validEmails.has(r.staffEmail.trim().toLowerCase())
+      );
+      await saveProgressReports(finalReports);
+    }
 
     return sendJson(res, 200, {
       ytdTasks: workbook.ytdTasks,
       staff: sanitizeStaff(updatedStaff),
-      progressReports: body.progressReports || workbook.progressReports,
+      progressReports: finalReports,
       databaseId: getDatabaseId(),
     });
   } catch (error: any) {

@@ -261,25 +261,13 @@ export async function saveYTDTasks(tasks: YTDTask[]) {
 }
 
 export async function saveStaffProfiles(staff: StaffMember[]) {
-  if (!staff || !Array.isArray(staff) || staff.length === 0) return;
-
-  let existingStaff: StaffMember[] = [];
-  try {
-    const rawData = await sheetsFetch(`/values/${encodeURIComponent('Staff_Profiles!A1:I10000')}`);
-    existingStaff = parseStaff(rawData.values || []);
-  } catch (e) {
-    console.warn('Could not read existing Staff_Profiles sheet for merge:', e);
-  }
+  if (!staff || !Array.isArray(staff)) return;
 
   const staffMap = new Map<string, StaffMember>();
-  existingStaff.forEach((s) => {
-    if (s && s.email) staffMap.set(s.email.toLowerCase(), s);
-  });
   staff.forEach((s) => {
     if (s && s.email) {
-      const email = s.email.toLowerCase();
-      const existing = staffMap.get(email);
-      staffMap.set(email, { ...existing, ...s });
+      const email = s.email.trim().toLowerCase();
+      staffMap.set(email, { ...s, email });
     }
   });
 
@@ -312,8 +300,8 @@ export async function saveStaffProfiles(staff: StaffMember[]) {
   await updateRange('Staff_Profiles!A1:I', [headers, ...rows]);
 }
 
-export async function saveProgressReports(reports: MonthProgress[]) {
-  if (!reports || !Array.isArray(reports) || reports.length === 0) return;
+export async function saveProgressReports(reports: MonthProgress[], validStaffEmails?: string[]) {
+  if (!reports || !Array.isArray(reports)) return;
 
   let existingReports: MonthProgress[] = [];
   try {
@@ -321,6 +309,11 @@ export async function saveProgressReports(reports: MonthProgress[]) {
     existingReports = parseProgressReports(rawData.values || []);
   } catch (e) {
     console.warn('Could not read existing Progress_Reports sheet for merge:', e);
+  }
+
+  if (validStaffEmails && validStaffEmails.length > 0) {
+    const validSet = new Set(validStaffEmails.map((e) => e.toLowerCase()));
+    existingReports = existingReports.filter((r) => r.staffEmail && validSet.has(r.staffEmail.toLowerCase()));
   }
 
   const reportMap = new Map<string, MonthProgress>();
