@@ -3,6 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface TaskDailyUpdate {
+  id: string;
+  taskId: string;
+  taskDescription: string;
+  department: string;
+  lead: string;
+  coWorker?: string;
+  contractorHead?: string;
+  action: 'CREATED' | 'STATUS_CHANGE' | 'REMARK_UPDATE' | 'COMPLETED' | 'GENERAL_UPDATE';
+  previousStatus?: string;
+  newStatus?: string;
+  previousRemark?: string;
+  newRemark?: string;
+  updatedBy: string;
+  date: string; // YYYY-MM-DD
+  timestamp: string; // ISO string
+}
+
 export interface YTDTask {
   id: string;
   department: string;
@@ -18,6 +36,10 @@ export interface YTDTask {
   completedMonth?: string;
   completedAt?: string;
   carriedOverFrom?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  lastUpdatedDate?: string;
+  history?: TaskDailyUpdate[];
 }
 
 export interface StaffMember {

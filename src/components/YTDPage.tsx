@@ -17,10 +17,12 @@ import {
   User,
   Activity,
   CheckCircle,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 import { StaffMember, YTDTask } from '../types';
 import { getCurrentLagosMonth, getTaskStartMonth, isTaskCompleted } from '../data/mockData';
+import DailyReportModal from './DailyReportModal';
 
 interface YTDPageProps {
   tasks: YTDTask[];
@@ -32,6 +34,7 @@ interface YTDPageProps {
   statuses: string[];
   staffList: StaffMember[];
   contractorHeads: string[];
+  currentUserName?: string;
 }
 
 export default function YTDPage({
@@ -44,11 +47,13 @@ export default function YTDPage({
   statuses,
   staffList,
   contractorHeads,
+  currentUserName = 'Admin',
 }: YTDPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isAdding, setIsAdding] = useState(false);
+  const [showDailyReportModal, setShowDailyReportModal] = useState(false);
   
   // New Task form state
   const [newTask, setNewTask] = useState({
@@ -217,15 +222,26 @@ export default function YTDPage({
           </div>
         </div>
 
-        {/* Add Task Trigger (Only available to Admins/Leads or during demo) */}
+        {/* Admin Action Triggers */}
         {isAdmin && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm shadow-orange-500/10 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create YTD Task</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="download-daily-report-btn"
+              onClick={() => setShowDailyReportModal(true)}
+              className="flex items-center space-x-2 bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-sm font-semibold shadow-sm border border-slate-700/80 transition-all hover:border-slate-600"
+              title="Generate and download daily report of task updates"
+            >
+              <FileText className="w-4 h-4 text-orange-400" />
+              <span>Download Daily Report</span>
+            </button>
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm shadow-orange-500/10 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create YTD Task</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -700,6 +716,14 @@ export default function YTDPage({
           </table>
         </div>
       </div>
+
+      {/* Daily Report Download & Preview Modal */}
+      <DailyReportModal
+        isOpen={showDailyReportModal}
+        onClose={() => setShowDailyReportModal(false)}
+        tasks={tasks}
+        currentUserName={currentUserName}
+      />
     </div>
   );
 }

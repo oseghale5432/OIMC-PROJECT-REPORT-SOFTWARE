@@ -44,6 +44,7 @@ import SendNotificationModal from './components/SendNotificationModal';
 import { ApiClient, WorkbookPayload } from './apiClient';
 import { requestNotificationPermission, subscribeToPushNotifications, onForegroundMessage } from './firebaseMessaging';
 import { DEFAULT_ACCOUNTING_CODES } from './data/accountingCodes';
+import { getCurrentLagosDate, recordTaskUpdate } from './utils/dailyReportUtils';
 
 const DEFAULT_CONTRACTOR_HEADS = [
   'BRICK MORTAR STEEL (BMS)',
@@ -693,12 +694,23 @@ export default function App() {
     today.setHours(0, 0, 0, 0);
     const diffTime = due.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const nowIso = new Date().toISOString();
+    const todayLagos = getCurrentLagosDate();
 
     const task: YTDTask = {
       ...newTask,
       id: `ytd_${Math.random().toString(36).substr(2, 9)}`,
       daysRemaining: diffDays,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      lastUpdatedDate: todayLagos,
     };
+
+    recordTaskUpdate(task, 'CREATED', {
+      newStatus: task.status,
+      newRemark: task.remark,
+      updatedBy: currentUser?.displayName || currentUser?.name || currentUser?.email || 'Super Admin',
+    });
 
     const updatedTasks = [...tasks, task];
     setTasks(updatedTasks);
@@ -711,7 +723,37 @@ export default function App() {
 
   // Update YTD Task
   const handleUpdateTask = async (updatedTask: YTDTask) => {
-    const updatedTasks = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+    const oldTask = tasks.find((t) => t.id === updatedTask.id);
+    const nowIso = new Date().toISOString();
+    const todayLagos = getCurrentLagosDate();
+
+    let action: 'CREATED' | 'STATUS_CHANGE' | 'REMARK_UPDATE' | 'COMPLETED' | 'GENERAL_UPDATE' = 'GENERAL_UPDATE';
+    const isCompleted = updatedTask.status?.toLowerCase().includes('complete') || updatedTask.status?.toLowerCase() === 'done';
+    const wasCompleted = oldTask?.status?.toLowerCase().includes('complete') || oldTask?.status?.toLowerCase() === 'done';
+
+    if (isCompleted && !wasCompleted) {
+      action = 'COMPLETED';
+    } else if (oldTask && oldTask.status !== updatedTask.status) {
+      action = 'STATUS_CHANGE';
+    } else if (oldTask && oldTask.remark !== updatedTask.remark) {
+      action = 'REMARK_UPDATE';
+    }
+
+    const taskWithAudit: YTDTask = {
+      ...updatedTask,
+      updatedAt: nowIso,
+      lastUpdatedDate: todayLagos,
+    };
+
+    recordTaskUpdate(taskWithAudit, action, {
+      previousStatus: oldTask?.status,
+      newStatus: updatedTask.status,
+      previousRemark: oldTask?.remark,
+      newRemark: updatedTask.remark,
+      updatedBy: currentUser?.displayName || currentUser?.name || currentUser?.email || 'Super Admin',
+    });
+
+    const updatedTasks = tasks.map((t) => (t.id === updatedTask.id ? taskWithAudit : t));
     setTasks(updatedTasks);
 
     // Logged-in users save through Firestore.
@@ -742,7 +784,34 @@ export default function App() {
     setProgressReports(updatedAllReports);
 
     if (updatedYTDTasks) {
-      setTasks(updatedYTDTasks);
+      const nowIso = new Date().toISOString();
+      const todayLagos = getCurrentLagosDate();
+
+      const tasksWithAudit = updatedYTDTasks.map((newTask) => {
+        const oldTask = tasks.find((t) => t.id === newTask.id);
+        if (oldTask && (oldTask.status !== newTask.status || oldTask.remark !== newTask.remark)) {
+          const isCompleted = newTask.status?.toLowerCase().includes('complete') || newTask.status?.toLowerCase() === 'done';
+          const wasCompleted = oldTask.status?.toLowerCase().includes('complete') || oldTask.status?.toLowerCase() === 'done';
+          const action = isCompleted && !wasCompleted ? 'COMPLETED' : 'STATUS_CHANGE';
+
+          recordTaskUpdate(newTask, action, {
+            previousStatus: oldTask.status,
+            newStatus: newTask.status,
+            previousRemark: oldTask.remark,
+            newRemark: newTask.remark,
+            updatedBy: email,
+          });
+
+          return {
+            ...newTask,
+            updatedAt: nowIso,
+            lastUpdatedDate: todayLagos,
+          };
+        }
+        return newTask;
+      });
+
+      setTasks(tasksWithAudit);
     }
 
     // Logged-in users save through Supabase.
@@ -1439,6 +1508,7 @@ export default function App() {
               statuses={statuses}
               staffList={staffList}
               contractorHeads={contractorHeads}
+              currentUserName={currentUser?.displayName || currentUser?.name || 'Super Admin'}
             />
           )}
 
