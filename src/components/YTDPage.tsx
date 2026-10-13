@@ -232,7 +232,7 @@ export default function YTDPage({
               title="Generate and download daily report of task updates"
             >
               <FileText className="w-4 h-4 text-orange-400" />
-              <span>Download Daily Report</span>
+              <span>Download Reports</span>
             </button>
             <button
               onClick={() => setIsAdding(true)}

@@ -7,6 +7,47 @@ import { TaskDailyUpdate, YTDTask } from '../types';
 
 const DAILY_UPDATES_STORAGE_KEY = 'oi_task_daily_updates';
 
+export const ALL_MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+export type ReportFilterType = 'ALL' | 'COMPLETED_ONLY' | 'IN_PROGRESS';
+
+export interface ReportPeriod {
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  isRange: boolean;
+  label?: string;
+}
+
+/**
+ * Normalizes input parameter to a ReportPeriod object
+ */
+export function normalizePeriod(period: ReportPeriod | string): ReportPeriod {
+  if (typeof period === 'string') {
+    return {
+      startDate: period,
+      endDate: period,
+      isRange: false,
+    };
+  }
+  return {
+    ...period,
+    isRange: period.isRange || period.startDate !== period.endDate,
+  };
+}
+
 /**
  * Returns the current date in YYYY-MM-DD format based on Lagos (Africa/Lagos) timezone.
  */
@@ -26,7 +67,7 @@ export function getCurrentLagosDate(): string {
 
 /**
  * Formats a YYYY-MM-DD date string into a friendly, professional display format.
- * e.g., "Tuesday, October 13, 2026"
+ * e.g., "Tuesday, 13 October 2026"
  */
 export function formatLagosDateForDisplay(dateStr: string): string {
   if (!dateStr) return '';
@@ -37,6 +78,26 @@ export function formatLagosDateForDisplay(dateStr: string): string {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      year: 'numeric',
+      timeZone: 'Africa/Lagos',
+    }).format(date);
+  } catch {
+    return dateStr;
+  }
+}
+
+/**
+ * Formats a YYYY-MM-DD date string into a concise display format.
+ * e.g., "13 Oct 2026"
+ */
+export function formatLagosDateShort(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    return new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
       timeZone: 'Africa/Lagos',
     }).format(date);
@@ -96,8 +157,7 @@ export function loadDailyUpdateLogs(): TaskDailyUpdate[] {
  */
 export function saveDailyUpdateLogs(logs: TaskDailyUpdate[]): void {
   try {
-    // Keep the most recent 1000 updates to preserve storage efficiency
-    const trimmed = logs.slice(-1000);
+    const trimmed = logs.slice(-1500);
     localStorage.setItem(DAILY_UPDATES_STORAGE_KEY, JSON.stringify(trimmed));
   } catch (err) {
     console.warn('Failed to save daily update logs:', err);
@@ -147,53 +207,85 @@ export function recordTaskUpdate(
 }
 
 /**
- * Retrieves all updates for a specified date (YYYY-MM-DD).
- * Gathers entries from:
- * 1. Explicit log entries in localStorage
- * 2. Task embedded `history` entries
- * 3. Fallback discovery from task `updatedAt`, `lastUpdatedDate`, `completedAt`, or `startDate` matching the date
+ * Returns an array of month names covered between startDate and endDate.
  */
-export function getDailyUpdatesForDate(
-  targetDate: string,
+export function getMonthsInRange(startDateStr: string, endDateStr: string): string[] {
+  try {
+    const startMonthIdx = parseInt(startDateStr.split('-')[1], 10) - 1;
+    const endMonthIdx = parseInt(endDateStr.split('-')[1], 10) - 1;
+    if (isNaN(startMonthIdx) || isNaN(endMonthIdx)) return ALL_MONTH_NAMES;
+    if (startMonthIdx <= endMonthIdx) {
+      return ALL_MONTH_NAMES.slice(startMonthIdx, endMonthIdx + 1);
+    }
+    return ALL_MONTH_NAMES;
+  } catch {
+    return ALL_MONTH_NAMES;
+  }
+}
+
+/**
+ * Helper to check if a task is completed based on status or completedMonth.
+ */
+export function isTaskCompleted(task: YTDTask): boolean {
+  if (!task) return false;
+  const status = (task.status || '').toLowerCase();
+  return status.includes('complete') || status === 'done' || !!task.completedMonth;
+}
+
+/**
+ * Retrieves all updates / projects for a specified date range.
+ * Supports filtering by 'ALL', 'COMPLETED_ONLY', or 'IN_PROGRESS'.
+ */
+export function getUpdatesForDateRange(
+  startDate: string,
+  endDate: string,
   tasks: YTDTask[],
+  filterType: ReportFilterType = 'ALL',
   customLogs?: TaskDailyUpdate[]
 ): TaskDailyUpdate[] {
   const logs = customLogs || loadDailyUpdateLogs();
   const updatesMap = new Map<string, TaskDailyUpdate>();
+  const monthsInRange = new Set(getMonthsInRange(startDate, endDate));
 
-  // 1. From global logs
+  // 1. Gather from localStorage audit logs within range
   logs.forEach((log) => {
-    if (log.date === targetDate) {
+    if (log.date >= startDate && log.date <= endDate) {
       updatesMap.set(log.id, log);
     }
   });
 
-  // 2. From task embedded history
+  // 2. Gather from task embedded history within range
   tasks.forEach((t) => {
     if (Array.isArray(t.history)) {
       t.history.forEach((h) => {
-        if (h.date === targetDate) {
+        if (h.date >= startDate && h.date <= endDate) {
           updatesMap.set(h.id, h);
         }
       });
     }
   });
 
-  // 3. Fallback inference: if a task has lastUpdatedDate, completedAt, or startDate matching targetDate
+  // 3. Fallback inference & Completed project inclusion
   tasks.forEach((t) => {
-    const hasLogForTask = Array.from(updatesMap.values()).some((u) => u.taskId === t.id);
-    if (!hasLogForTask) {
-      const isCompletedOnDate = t.completedAt && t.completedAt.startsWith(targetDate);
-      const isUpdatedOnDate =
-        (t.lastUpdatedDate === targetDate) ||
-        (t.updatedAt && t.updatedAt.startsWith(targetDate));
-      const isCreatedOnDate =
-        (t.createdAt && t.createdAt.startsWith(targetDate)) ||
-        (t.startDate === targetDate);
+    const isCompleted = isTaskCompleted(t);
+    const completedDate = t.completedAt ? t.completedAt.split('T')[0] : '';
+    const updatedDate = t.lastUpdatedDate || (t.updatedAt ? t.updatedAt.split('T')[0] : '');
+    const createdDate = t.startDate || (t.createdAt ? t.createdAt.split('T')[0] : '');
 
-      if (isCompletedOnDate) {
-        updatesMap.set(`synth_comp_${t.id}`, {
-          id: `synth_comp_${t.id}`,
+    // Check if task completion falls in date range or in months range
+    const completedInRange =
+      (completedDate && completedDate >= startDate && completedDate <= endDate) ||
+      (isCompleted && t.completedMonth && monthsInRange.has(t.completedMonth));
+
+    const updatedInRange = updatedDate && updatedDate >= startDate && updatedDate <= endDate;
+    const createdInRange = createdDate && createdDate >= startDate && createdDate <= endDate;
+
+    // A. Completed tasks matching range
+    if (completedInRange) {
+      const synthId = `comp_${t.id}`;
+      if (!updatesMap.has(synthId)) {
+        updatesMap.set(synthId, {
+          id: synthId,
           taskId: t.id,
           taskDescription: t.description,
           department: t.department,
@@ -203,14 +295,20 @@ export function getDailyUpdatesForDate(
           action: 'COMPLETED',
           previousStatus: 'Work commenced',
           newStatus: t.status || 'Completed',
-          newRemark: t.remark,
+          newRemark: t.remark || (t.completedMonth ? `Completed in ${t.completedMonth}` : 'Completed'),
           updatedBy: t.lead || 'Staff',
-          date: targetDate,
-          timestamp: t.completedAt || `${targetDate}T12:00:00Z`,
+          date: completedDate || (createdDate >= startDate && createdDate <= endDate ? createdDate : endDate),
+          timestamp: t.completedAt || `${endDate}T12:00:00Z`,
         });
-      } else if (isUpdatedOnDate) {
-        updatesMap.set(`synth_upd_${t.id}`, {
-          id: `synth_upd_${t.id}`,
+      }
+    }
+
+    // B. Updated tasks in range
+    if (updatedInRange && !isCompleted) {
+      const synthId = `upd_${t.id}`;
+      if (!updatesMap.has(synthId)) {
+        updatesMap.set(synthId, {
+          id: synthId,
           taskId: t.id,
           taskDescription: t.description,
           department: t.department,
@@ -221,12 +319,18 @@ export function getDailyUpdatesForDate(
           newStatus: t.status,
           newRemark: t.remark,
           updatedBy: t.lead || 'Admin',
-          date: targetDate,
-          timestamp: t.updatedAt || `${targetDate}T12:00:00Z`,
+          date: updatedDate,
+          timestamp: t.updatedAt || `${updatedDate}T12:00:00Z`,
         });
-      } else if (isCreatedOnDate) {
-        updatesMap.set(`synth_new_${t.id}`, {
-          id: `synth_new_${t.id}`,
+      }
+    }
+
+    // C. Created tasks in range
+    if (createdInRange && !updatesMap.has(`comp_${t.id}`) && !updatesMap.has(`upd_${t.id}`)) {
+      const synthId = `new_${t.id}`;
+      if (!updatesMap.has(synthId)) {
+        updatesMap.set(synthId, {
+          id: synthId,
           taskId: t.id,
           taskDescription: t.description,
           department: t.department,
@@ -237,48 +341,118 @@ export function getDailyUpdatesForDate(
           newStatus: t.status,
           newRemark: t.remark,
           updatedBy: 'Admin',
-          date: targetDate,
-          timestamp: t.createdAt || `${targetDate}T09:00:00Z`,
+          date: createdDate,
+          timestamp: t.createdAt || `${createdDate}T09:00:00Z`,
         });
       }
     }
   });
 
-  // Sort updates chronologically
-  return Array.from(updatesMap.values()).sort((a, b) => {
+  // Convert to array
+  let results = Array.from(updatesMap.values());
+
+  // Apply Scope / Filter Filter
+  if (filterType === 'COMPLETED_ONLY') {
+    results = results.filter((u) => {
+      const isCompletedAction = u.action === 'COMPLETED';
+      const isCompletedStatus =
+        (u.newStatus || '').toLowerCase().includes('complete') || (u.newStatus || '').toLowerCase() === 'done';
+      return isCompletedAction || isCompletedStatus;
+    });
+
+    // Also include any tasks from allTasks that are marked completed if they match the months in range
+    tasks.forEach((t) => {
+      if (isTaskCompleted(t)) {
+        const inMonth = t.completedMonth && monthsInRange.has(t.completedMonth);
+        const inDate = t.completedAt && t.completedAt.split('T')[0] >= startDate && t.completedAt.split('T')[0] <= endDate;
+        if ((inMonth || inDate) && !results.some((r) => r.taskId === t.id)) {
+          results.push({
+            id: `comp_direct_${t.id}`,
+            taskId: t.id,
+            taskDescription: t.description,
+            department: t.department,
+            lead: t.lead,
+            coWorker: t.coWorker,
+            contractorHead: t.contractorHead,
+            action: 'COMPLETED',
+            newStatus: t.status || 'Completed',
+            newRemark: t.remark || (t.completedMonth ? `Completed in ${t.completedMonth}` : 'Completed'),
+            updatedBy: t.lead || 'Staff',
+            date: t.completedAt ? t.completedAt.split('T')[0] : endDate,
+            timestamp: t.completedAt || `${endDate}T12:00:00Z`,
+          });
+        }
+      }
+    });
+  } else if (filterType === 'IN_PROGRESS') {
+    results = results.filter((u) => {
+      const isCompleted =
+        u.action === 'COMPLETED' ||
+        (u.newStatus || '').toLowerCase().includes('complete') ||
+        (u.newStatus || '').toLowerCase() === 'done';
+      return !isCompleted;
+    });
+  }
+
+  // Sort chronologically (most recent first)
+  return results.sort((a, b) => {
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 }
 
 /**
- * Downloads a structured, Excel-compatible CSV of all task updates on the given date.
+ * Backward compatibility helper for single date.
+ */
+export function getDailyUpdatesForDate(
+  targetDate: string,
+  tasks: YTDTask[],
+  customLogs?: TaskDailyUpdate[]
+): TaskDailyUpdate[] {
+  return getUpdatesForDateRange(targetDate, targetDate, tasks, 'ALL', customLogs);
+}
+
+/**
+ * Downloads a structured, Excel-compatible CSV of all task updates / completed projects for a date or date range.
  */
 export function downloadDailyReportCSV(
-  targetDate: string,
+  periodParam: ReportPeriod | string,
   updates: TaskDailyUpdate[],
-  allTasks: YTDTask[]
+  allTasks: YTDTask[],
+  filterType: ReportFilterType = 'ALL'
 ): void {
-  const displayDate = formatLagosDateForDisplay(targetDate);
+  const period = normalizePeriod(periodParam);
   const rows: string[][] = [];
+
+  const periodHeader = period.isRange
+    ? `Report Period: ${formatLagosDateShort(period.startDate)} to ${formatLagosDateShort(period.endDate)} (${period.startDate} to ${period.endDate})`
+    : `Report Date: ${formatLagosDateForDisplay(period.startDate)} (${period.startDate})`;
+
+  const filterHeader =
+    filterType === 'COMPLETED_ONLY'
+      ? 'Scope: COMPLETED PROJECTS & TASKS ONLY'
+      : filterType === 'IN_PROGRESS'
+      ? 'Scope: ONGOING & IN-PROGRESS TASKS'
+      : 'Scope: ALL UPDATES & ACTIVITY';
 
   // Header banner
   rows.push(['ORANGE ISLAND DEVELOPMENT COMPANY (OIMC)']);
-  rows.push(['2026 YTD TASKS - DAILY PROGRESS & UPDATE REPORT']);
-  rows.push([`Report Date: ${displayDate} (${targetDate})`]);
+  rows.push(['2026 YTD TASKS - PROJECT PROGRESS & UPDATE REPORT']);
+  rows.push([periodHeader]);
+  rows.push([filterHeader]);
   rows.push([`Generated On: ${new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' })} (WAT)`]);
-  rows.push([`Total Task Updates Logged: ${updates.length}`]);
+  rows.push([`Total Items in Report: ${updates.length}`]);
   rows.push([]); // blank line
 
   // Column Headers
   rows.push([
-    'Time (WAT)',
+    'Date / Time (WAT)',
     'Task ID',
     'Department',
     'Lead / Managed By',
     'Co-Worker',
     'Contractor / Dept Head',
     'Task Description',
-    'Update Action',
+    'Action / Status',
     'Previous Status',
     'Current Status',
     'Remarks / Progress Notes',
@@ -290,8 +464,12 @@ export function downloadDailyReportCSV(
   if (updates.length > 0) {
     updates.forEach((u) => {
       const matchedTask = allTasks.find((t) => t.id === u.taskId);
+      const displayTime = period.isRange
+        ? `${u.date} ${formatLagosTime(u.timestamp)}`
+        : formatLagosTime(u.timestamp);
+
       rows.push([
-        formatLagosTime(u.timestamp),
+        displayTime,
         u.taskId,
         u.department,
         u.lead,
@@ -308,7 +486,7 @@ export function downloadDailyReportCSV(
       ]);
     });
   } else {
-    rows.push(['No specific updates were logged for this date.']);
+    rows.push(['No tasks or updates recorded for this selected period and filter.']);
   }
 
   // Convert to CSV with standard escaping and UTF-8 BOM for Microsoft Excel
@@ -319,7 +497,6 @@ export function downloadDailyReportCSV(
         row
           .map((cell) => {
             const val = cell === undefined || cell === null ? '' : String(cell);
-            // Escape double quotes by doubling them
             return `"${val.replace(/"/g, '""')}"`;
           })
           .join(',')
@@ -329,8 +506,20 @@ export function downloadDailyReportCSV(
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
+
+  const filenameSuffix =
+    filterType === 'COMPLETED_ONLY'
+      ? '_Completed_Projects'
+      : filterType === 'IN_PROGRESS'
+      ? '_In_Progress'
+      : '';
+
+  const dateSuffix = period.isRange
+    ? `${period.startDate}_to_${period.endDate}`
+    : period.startDate;
+
   link.setAttribute('href', url);
-  link.setAttribute('download', `OIMC_2026_YTD_Daily_Report_${targetDate}.csv`);
+  link.setAttribute('download', `OIMC_2026_YTD_Report${filenameSuffix}_${dateSuffix}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -341,25 +530,36 @@ export function downloadDailyReportCSV(
  * Opens a print-optimized, executive PDF document in a new window or trigger print dialog.
  */
 export function openDailyReportPrintPDF(
-  targetDate: string,
+  periodParam: ReportPeriod | string,
   updates: TaskDailyUpdate[],
   allTasks: YTDTask[],
   generatedBy: string,
-  mode: 'UPDATES_ONLY' | 'ALL_ACTIVE_SNAPSHOT' = 'UPDATES_ONLY'
+  mode: 'UPDATES_ONLY' | 'ALL_ACTIVE_SNAPSHOT' = 'UPDATES_ONLY',
+  filterType: ReportFilterType = 'ALL'
 ): void {
-  const displayDate = formatLagosDateForDisplay(targetDate);
+  const period = normalizePeriod(periodParam);
+
+  const displayDateOrPeriod = period.isRange
+    ? `${formatLagosDateShort(period.startDate)} – ${formatLagosDateShort(period.endDate)}`
+    : formatLagosDateForDisplay(period.startDate);
+
+  const periodSubtitle = period.isRange
+    ? `From ${period.startDate} to ${period.endDate}`
+    : `Date: ${period.startDate}`;
+
   const nowDisplay = new Date().toLocaleString('en-US', {
     timeZone: 'Africa/Lagos',
     dateStyle: 'full',
     timeStyle: 'short',
   });
 
-  const totalUpdates = updates.length;
+  const totalItems = updates.length;
   const completedCount = updates.filter(
     (u) =>
       u.action === 'COMPLETED' ||
       (u.newStatus && (u.newStatus.toLowerCase().includes('complete') || u.newStatus.toLowerCase() === 'done'))
   ).length;
+
   const inProgressCount = updates.filter(
     (u) =>
       u.action === 'STATUS_CHANGE' &&
@@ -367,10 +567,10 @@ export function openDailyReportPrintPDF(
       !u.newStatus.toLowerCase().includes('complete') &&
       !u.newStatus.toLowerCase().includes('not started')
   ).length;
-  const createdCount = updates.filter((u) => u.action === 'CREATED').length;
-  const remarksUpdatedCount = updates.filter((u) => u.action === 'REMARK_UPDATE').length;
 
-  // Gather active snapshot tasks if requested
+  const createdCount = updates.filter((u) => u.action === 'CREATED').length;
+
+  // Active snapshot tasks
   const activeTasks = allTasks.filter((t) => {
     const isCompleted = t.status.toLowerCase().includes('complete') || t.status.toLowerCase() === 'done';
     return !isCompleted;
@@ -382,12 +582,19 @@ export function openDailyReportPrintPDF(
     return;
   }
 
+  const scopeLabel =
+    filterType === 'COMPLETED_ONLY'
+      ? 'Completed Projects & Tasks'
+      : filterType === 'IN_PROGRESS'
+      ? 'Ongoing & In-Progress Tasks'
+      : 'All Updates & Progress';
+
   const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>OIMC 2026 YTD Task Daily Report - ${escapeHtml(targetDate)}</title>
+  <title>OIMC 2026 YTD Report - ${escapeHtml(displayDateOrPeriod)}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -414,7 +621,7 @@ export function openDailyReportPrintPDF(
       margin-bottom: 16px;
     }
     .company-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 800;
       color: #0f172a;
       letter-spacing: -0.5px;
@@ -610,7 +817,7 @@ export function openDailyReportPrintPDF(
 <body>
   <div class="no-print-bar">
     <div>
-      <strong>Executive Daily Report Generated</strong> — Ready to Save as PDF or Print
+      <strong>Executive Report Generated</strong> — Ready to Save as PDF or Print
     </div>
     <button class="print-btn" onclick="window.print()">Save as PDF / Print Report</button>
   </div>
@@ -618,29 +825,30 @@ export function openDailyReportPrintPDF(
   <div class="header-container">
     <div>
       <div class="company-title">Orange Island Development Company (OIMC)</div>
-      <div class="report-title">2026 YTD Task - Daily Progress & Update Report</div>
+      <div class="report-title">2026 YTD Task — ${escapeHtml(scopeLabel)}</div>
       <div class="report-meta">
         Generated by: <strong>${escapeHtml(generatedBy || 'Admin')}</strong> | Generated at: ${escapeHtml(nowDisplay)}
       </div>
     </div>
     <div class="header-badge">
-      <div class="badge-label">Report Date</div>
-      <div class="badge-date">${escapeHtml(targetDate)}</div>
+      <div class="badge-label">${period.isRange ? 'Report Period' : 'Report Date'}</div>
+      <div class="badge-date">${escapeHtml(displayDateOrPeriod)}</div>
+      <div style="font-size: 8.5px; color: #cbd5e1; margin-top: 1px;">${escapeHtml(periodSubtitle)}</div>
     </div>
   </div>
 
   <div class="kpi-grid">
     <div class="kpi-card highlight">
-      <div class="kpi-value orange">${totalUpdates}</div>
-      <div class="kpi-label">Updates Logged Today</div>
+      <div class="kpi-value orange">${totalItems}</div>
+      <div class="kpi-label">Total Items in Scope</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-value green">${completedCount}</div>
-      <div class="kpi-label">Marked Completed</div>
+      <div class="kpi-label">Completed Projects</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-value blue">${inProgressCount}</div>
-      <div class="kpi-label">Progress / Commenced</div>
+      <div class="kpi-label">In Progress / Commenced</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-value">${createdCount}</div>
@@ -649,8 +857,8 @@ export function openDailyReportPrintPDF(
   </div>
 
   <div class="section-heading">
-    <span>Detailed Record of Updates (${escapeHtml(displayDate)})</span>
-    <span style="font-size: 9px; color: #64748b; font-weight: normal;">Showing ${totalUpdates} item(s)</span>
+    <span>Itemized Project Details (${escapeHtml(displayDateOrPeriod)})</span>
+    <span style="font-size: 9px; color: #64748b; font-weight: normal;">Showing ${totalItems} item(s)</span>
   </div>
 
   ${
@@ -659,13 +867,13 @@ export function openDailyReportPrintPDF(
   <table>
     <thead>
       <tr>
-        <th style="width: 55px;">Time</th>
+        <th style="width: 70px;">${period.isRange ? 'Date' : 'Time'}</th>
         <th style="width: 80px;">Dept</th>
         <th>Task Description</th>
         <th style="width: 95px;">Lead / Co-Worker</th>
-        <th style="width: 100px;">Contractor Head</th>
-        <th style="width: 110px;">Update Status</th>
-        <th>Remarks / Notes</th>
+        <th style="width: 95px;">Contractor Head</th>
+        <th style="width: 100px;">Status</th>
+        <th>Remarks / Accomplishments</th>
         <th style="width: 65px;">Updated By</th>
       </tr>
     </thead>
@@ -673,12 +881,15 @@ export function openDailyReportPrintPDF(
       ${updates
         .map((u) => {
           let actionBadge = `<span class="badge badge-neutral">${escapeHtml(u.action.replace('_', ' '))}</span>`;
-          if (u.action === 'COMPLETED') {
+          if (
+            u.action === 'COMPLETED' ||
+            (u.newStatus && (u.newStatus.toLowerCase().includes('complete') || u.newStatus.toLowerCase() === 'done'))
+          ) {
             actionBadge = `<span class="badge badge-success">Completed</span>`;
           } else if (u.action === 'CREATED') {
             actionBadge = `<span class="badge badge-orange">New Task</span>`;
           } else if (u.action === 'STATUS_CHANGE') {
-            actionBadge = `<span class="badge badge-info">Status Update</span>`;
+            actionBadge = `<span class="badge badge-info">In Progress</span>`;
           }
 
           const statusDisplay =
@@ -686,9 +897,13 @@ export function openDailyReportPrintPDF(
               ? `<div class="status-change">${escapeHtml(u.previousStatus)} <span class="status-arrow">→</span> <strong>${escapeHtml(u.newStatus || '')}</strong></div>`
               : `<div class="status-pill">${escapeHtml(u.newStatus || 'Updated')}</div>`;
 
+          const timeDisplay = period.isRange
+            ? `<div style="font-weight: 700;">${escapeHtml(u.date)}</div><div style="font-size: 8.5px; color: #64748b;">${escapeHtml(formatLagosTime(u.timestamp))}</div>`
+            : `<span style="font-family: monospace; font-size: 9px;">${escapeHtml(formatLagosTime(u.timestamp))}</span>`;
+
           return `
             <tr>
-              <td><span style="font-family: monospace; font-size: 9px;">${escapeHtml(formatLagosTime(u.timestamp))}</span></td>
+              <td>${timeDisplay}</td>
               <td><strong>${escapeHtml(u.department)}</strong></td>
               <td>${escapeHtml(u.taskDescription)}</td>
               <td>
@@ -700,7 +915,7 @@ export function openDailyReportPrintPDF(
                 <div style="margin-bottom: 3px;">${actionBadge}</div>
                 ${statusDisplay}
               </td>
-              <td style="color: #334155; font-style: italic;">
+              <td style="color: #334155;">
                 ${u.newRemark ? escapeHtml(u.newRemark) : '<span style="color: #94a3b8;">No remark</span>'}
               </td>
               <td><span style="font-size: 8.5px; color: #64748b;">${escapeHtml(u.updatedBy)}</span></td>
@@ -713,8 +928,8 @@ export function openDailyReportPrintPDF(
   `
       : `
   <div style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 24px; text-align: center; border-radius: 6px; margin-bottom: 20px;">
-    <div style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 4px;">No specific updates recorded for ${escapeHtml(targetDate)}</div>
-    <div style="font-size: 10px; color: #64748b;">All active 2026 YTD tasks remain in ongoing execution. Below is the active task status snapshot for management reference.</div>
+    <div style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 4px;">No specific records found for ${escapeHtml(displayDateOrPeriod)}</div>
+    <div style="font-size: 10px; color: #64748b;">Try widening the date range or selecting another filter option. Below is the active task status snapshot for reference.</div>
   </div>
   `
   }
@@ -781,7 +996,6 @@ export function openDailyReportPrintPDF(
   </div>
 
   <script>
-    // Automatically trigger print dialog after document rendering completes
     window.onload = function() {
       setTimeout(function() {
         window.print();
